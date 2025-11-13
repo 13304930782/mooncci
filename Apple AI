@@ -1,0 +1,17 @@
+# Apple AI / Siri / Relay
+# 域名后缀匹配
+DOMAIN-SUFFIX,guzzoni.apple.com
+DOMAIN-SUFFIX,smoot.apple.com
+DOMAIN-SUFFIX,smoot.apple.cn
+
+# Apple Relay 相关
+DOMAIN-SUFFIX,apple-relay.apple.com
+DOMAIN-SUFFIX,apple-relay.cloudflare.com
+DOMAIN-SUFFIX,apple-relay.fastly-edge.com
+DOMAIN-SUFFIX,cp4.cloudflare.com
+
+# 通用 Siri / 语音相关（可选，想精简可以删掉）
+DOMAIN-SUFFIX,siri.apple.com
+DOMAIN-SUFFIX,siri.apple.cn
+DOMAIN-SUFFIX,dictation.apple.com
+DOMAIN-SUFFIX,dictation.apple.cn
