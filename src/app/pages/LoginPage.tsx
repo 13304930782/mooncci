@@ -1,0 +1,3 @@
+import { useState } from 'react';import { useNavigate } from 'react-router-dom';import { useAuth } from '../context/AuthContext';
+export default function LoginPage(){const {login}=useAuth();const nav=useNavigate();const [f,sf]=useState({email:'',password:''});
+return <div className='max-w-md mx-auto pt-32'><h1 className='text-2xl mb-4'>登录</h1><input className='w-full border p-2 mb-2' placeholder='邮箱' onChange={e=>sf({...f,email:e.target.value})}/><input type='password' className='w-full border p-2 mb-2' placeholder='密码' onChange={e=>sf({...f,password:e.target.value})}/><button className='px-4 py-2 bg-blue-600 text-white' onClick={async()=>{await login(f.email,f.password);nav('/admin');}}>登录</button></div>}
