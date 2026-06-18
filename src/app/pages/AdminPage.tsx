@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserRoundCheck,
   Users,
+  Video,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -59,6 +60,7 @@ export default function AdminPage() {
     users: 0,
     comments: 0,
     bannedWords: 0,
+    videos: 0,
   });
 
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function AdminPage() {
           manager ? api('/admin/users') : Promise.resolve([]),
           manager ? api('/admin/comments?status=all') : Promise.resolve([]),
           manager ? api('/admin/banned-words') : Promise.resolve([]),
+          writer ? api('/videos/admin') : Promise.resolve([]),
         ]);
 
         if (cancelled) return;
@@ -87,6 +90,7 @@ export default function AdminPage() {
           users: getLength(1),
           comments: getLength(2),
           bannedWords: getLength(3),
+          videos: getLength(4),
         });
       } catch {
         // 不影响页面显示
@@ -105,6 +109,12 @@ export default function AdminPage() {
       title: '文章总数',
       value: stats.posts,
       icon: FileText,
+      show: writer,
+    },
+    {
+      title: '视频总数',
+      value: stats.videos,
+      icon: Video,
       show: writer,
     },
     {
@@ -148,6 +158,13 @@ export default function AdminPage() {
       to: '/admin/comments',
       icon: MessageCircle,
       show: manager,
+    },
+    {
+      title: '视频评审',
+      desc: '上传答辩视频，查看评分统计和点评明细',
+      to: '/admin/videos',
+      icon: Video,
+      show: writer,
     },
     {
       title: '用户管理',

@@ -1,178 +1,126 @@
-import { Calendar, User, ArrowLeft, MessageCircle, Trash2, Reply } from 'lucide-react';
+import { ArrowLeft, Calendar, User } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { MarkdownContent } from '../components/MarkdownContent';
 import { CommentSection } from '../components/CommentSection';
+import { applyPageSeoMeta, resetPageSeoMeta } from '../components/SiteMeta';
 import { api } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
+
+const SITE_URL = 'https://mooncci.site';
+
+function parseTags(raw: unknown): string[] {
+  try {
+    if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+    return JSON.parse(String(raw || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+function stripMarkdown(input: string) {
+  return String(input || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
+    .replace(/[#>*_`~-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function createDescription(post: any) {
+  const text = String(post?.summary || '').trim() || stripMarkdown(post?.content || '');
+  return text.length > 150 ? `${text.slice(0, 147)}...` : text;
+}
+
+function absoluteUrl(value?: string) {
+  if (!value) return '';
+
+  try {
+    return new URL(value, SITE_URL).toString();
+  } catch {
+    return '';
+  }
+}
 
 export default function ArticlePage() {
   const { id } = useParams();
-  const { user } = useAuth();
-
   const [post, setPost] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [commentContent, setCommentContent] = useState('');
-  const [replyContent, setReplyContent] = useState('');
-  const [replyTarget, setReplyTarget] = useState<any>(null);
   const [message, setMessage] = useState('正在加载文章...');
-  const [commentMessage, setCommentMessage] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const loadComments = () => {
-    if (!id) return;
-    api(`/comments/post/${id}`).then(setComments).catch(() => {});
-  };
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) return undefined;
+
+    let active = true;
+    setPost(null);
+    setMessage('正在加载文章...');
 
     api(`/posts/${id}`)
       .then((data) => {
+        if (!active) return;
+
         setPost(data);
         setMessage('');
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch((err) => {
+        if (!active) return;
         setMessage(err.message || '文章加载失败');
       });
 
-    loadComments();
+    return () => {
+      active = false;
+      resetPageSeoMeta();
+    };
   }, [id]);
 
-  const commentTree = useMemo(() => {
-    const top = comments.filter((c) => !c.parent_id);
-    const replies = comments.filter((c) => c.parent_id);
+  const tags = useMemo(() => parseTags(post?.tags), [post?.tags]);
 
-    return top.map((item) => ({
-      ...item,
-      replies: replies.filter((r) => r.parent_id === item.id),
-    }));
-  }, [comments]);
+  useEffect(() => {
+    if (!post) return;
 
-  const submitComment = async (event: React.FormEvent) => {
-    event.preventDefault();
+    const description = createDescription(post);
+    const canonical = `/article/${post.id}`;
+    const image = absoluteUrl(post.cover_image);
+    const publishedTime = post.published_at || post.created_at;
+    const modifiedTime = post.updated_at || publishedTime;
 
-    if (!commentContent.trim()) {
-      setCommentMessage('评论内容不能为空');
-      return;
-    }
-
-    setSubmitting(true);
-    setCommentMessage('');
-
-    try {
-      await api(`/comments/post/${id}`, {
-        method: 'POST',
-        body: JSON.stringify({ content: commentContent }),
-      });
-
-      setCommentContent('');
-      setCommentMessage('评论已提交，正在审核中');
-      loadComments();
-    } catch (err: any) {
-      setCommentMessage(err.message || '评论失败');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const submitReply = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!replyTarget || !replyContent.trim()) {
-      setCommentMessage('回复内容不能为空');
-      return;
-    }
-
-    setSubmitting(true);
-    setCommentMessage('');
-
-    try {
-      await api(`/comments/post/${id}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          content: replyContent,
-          parent_id: replyTarget.parent_id || replyTarget.id,
-          reply_to_user_id: replyTarget.user_id,
-        }),
-      });
-
-      setReplyContent('');
-      setReplyTarget(null);
-      setCommentMessage('回复已提交，正在审核中');
-      loadComments();
-    } catch (err: any) {
-      setCommentMessage(err.message || '回复失败');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const deleteComment = async (commentId: number) => {
-    if (!window.confirm('确定要删除这条评论吗？')) return;
-
-    try {
-      await api(`/comments/${commentId}`, { method: 'DELETE' });
-      setCommentMessage('删除成功');
-      loadComments();
-    } catch (err: any) {
-      setCommentMessage(err.message || '删除失败');
-    }
-  };
-
-  let tags: string[] = [];
-  if (post?.tags) {
-    try {
-      tags = Array.isArray(post.tags) ? post.tags : JSON.parse(post.tags || '[]');
-    } catch {
-      tags = [];
-    }
-  }
-
-  const CommentItem = ({ comment, isReply = false }: { comment: any; isReply?: boolean }) => (
-    <div className={`${isReply ? 'ml-6 md:ml-10 mt-3' : ''} rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-950/70 px-5 py-4`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-            <span className="font-medium text-gray-900 dark:text-white">{comment.author_name}</span>
-            {comment.reply_to_name && <span>回复 @{comment.reply_to_name}</span>}
-            <span>{comment.created_at?.slice(0, 10)}</span>
-            {comment.ip_address_masked && <span>来自 {comment.ip_address_masked}</span>}
-          </div>
-
-          <p className="mt-3 whitespace-pre-wrap leading-7 text-gray-700 dark:text-gray-200">
-            {comment.content}
-          </p>
-
-          {user && (
-            <button
-              onClick={() => {
-                setReplyTarget(comment);
-                setReplyContent('');
-              }}
-              className="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              <Reply className="w-4 h-4" />
-              回复
-            </button>
-          )}
-        </div>
-
-        {(['owner', 'admin'].includes(user?.role || '') || user?.id === comment.user_id) && (
-          <button
-            onClick={() => deleteComment(comment.id)}
-            className="shrink-0 rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-            title="删除评论"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
+    applyPageSeoMeta({
+      title: post.title,
+      description,
+      canonical,
+      image,
+      type: 'article',
+      publishedTime,
+      modifiedTime,
+      authorName: post.author_name,
+      tags,
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'BlogPosting',
+        headline: post.title,
+        description,
+        image: image ? [image] : undefined,
+        datePublished: publishedTime,
+        dateModified: modifiedTime,
+        author: {
+          '@type': 'Person',
+          name: post.author_name || 'Mooncci',
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: 'Mooncci Blog',
+          url: SITE_URL,
+        },
+        mainEntityOfPage: {
+          '@type': 'WebPage',
+          '@id': absoluteUrl(canonical),
+        },
+        keywords: tags.join(','),
+      },
+    });
+  }, [post, tags]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
@@ -190,7 +138,11 @@ export default function ArticlePage() {
             返回文章列表
           </Link>
 
-          {message && <div className="mt-8 rounded-xl bg-blue-50 px-4 py-3 text-blue-700">{message}</div>}
+          {message && (
+            <div className="mt-8 rounded-xl bg-blue-50 px-4 py-3 text-blue-700">
+              {message}
+            </div>
+          )}
 
           {post && (
             <>
@@ -205,13 +157,19 @@ export default function ArticlePage() {
                 />
               )}
 
-              <div className="mt-8 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span key={tag} className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/50">
-                    {tag}
-                  </span>
-                ))}
-              </div>
+              {tags.length > 0 && (
+                <div className="mt-8 flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <Link
+                      key={tag}
+                      to={`/tag/${encodeURIComponent(tag)}`}
+                      className="px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium border border-blue-100 dark:border-blue-800/50"
+                    >
+                      {tag}
+                    </Link>
+                  ))}
+                </div>
+              )}
 
               <h1 className="mt-5 text-4xl md:text-5xl font-bold text-gray-900 dark:text-white leading-tight">
                 {post.title}
@@ -225,10 +183,14 @@ export default function ArticlePage() {
 
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  <span>{post.created_at?.slice(0, 10)}</span>
+                  <span>{post.published_at?.slice(0, 10) || post.created_at?.slice(0, 10)}</span>
                 </div>
 
-                {post.category && <span>分类：{post.category}</span>}
+                {post.category && (
+                  <Link to={`/category/${encodeURIComponent(post.category)}`} className="hover:text-blue-600">
+                    分类：{post.category}
+                  </Link>
+                )}
               </div>
 
               {post.summary && (
@@ -238,12 +200,12 @@ export default function ArticlePage() {
               )}
 
               <MarkdownContent content={post.content || ''} />
-</>
+            </>
           )}
         </motion.article>
 
         {post && <CommentSection postId={post.id} />}
-</main>
+      </main>
     </div>
   );
 }

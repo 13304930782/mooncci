@@ -1,7 +1,7 @@
 export const initialSiteSettings = {
   "brand": {
-    "site_title": "Mooncci Blog",
-    "nav_title": "Mooncci Blog",
+    "site_title": "mooncci的博客",
+    "nav_title": "mooncci's blog",
     "logo_url": "/api/uploads/1779296103085-18ab618a2f2db.jpg",
     "favicon_url": "/api/uploads/1779296108961-7c263519963d5.ico"
   },
@@ -10,9 +10,9 @@ export const initialSiteSettings = {
     "title": "Blog owner",
     "bio": "Notes about technology, life and thinking.",
     "avatar_url": "/api/uploads/1779296094012-cb0e8204ec462.jpg",
-    "github_url": "",
+    "github_url": "https://github.com/13304930782/mooncci",
     "twitter_url": "",
-    "email": ""
+    "email": "qubanghe@gmail.com"
   },
   "hero": {
     "badge": "欢迎来到我的技术博客",
@@ -26,7 +26,7 @@ export const initialSiteSettings = {
     "secondary_link": "/categories"
   },
   "footer": {
-    "copyright": "Copyright Mooncci in LNTU",
+    "copyright": "Copyright mooncci in LNTU",
     "icp_text": " 辽ICP备2024042989号-2",
     "icp_url": "https://beian.miit.gov.cn/",
     "police_text": "辽公网安备21041102000446号",

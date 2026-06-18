@@ -10,6 +10,10 @@ const uploadRoutes = require('./routes/upload');
 const applicationRoutes = require('./routes/applications');
 const settingsRoutes = require('./routes/settings');
 const commentRoutes = require('./routes/comments');
+const routerMonitorRoutes = require('./routes/routerMonitor');
+const homeSettingsRoutes = require('./routes/homeSettings');
+const announcementRoutes = require('./routes/announcements');
+const videoRoutes = require('./routes/videos');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -23,6 +27,8 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
+      mediaSrc: ["'self'", "https:", "blob:"],
+      frameSrc: ["'self'", "https://player.bilibili.com", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "data:"],
       objectSrc: ["'none'"],
@@ -93,6 +99,7 @@ const globalLimiter = rateLimit({
   message: { message: '请求过于频繁，请稍后重试' },
 });
 app.use('/api', globalLimiter);
+app.use('/api/router-monitor/report', routerMonitorRoutes.reportRouter);
 app.use('/api', requireRequestedWith);
 
 // 认证接口限流（防暴力破解）
@@ -122,8 +129,12 @@ app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/upload', uploadRoutes.router);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/home-settings', homeSettingsRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/videos', videoRoutes.router);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/router-monitor', routerMonitorRoutes.router);
 
 const port = Number(process.env.PORT || 3001);
 app.listen(port, () => console.log(`server running on ${port}`));

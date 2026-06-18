@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
+  Activity,
   Ban,
+  ChevronDown,
   Crown,
   FileText,
   Home,
@@ -10,6 +12,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  Megaphone,
   Menu,
   MessageCircle,
   PenLine,
@@ -18,6 +21,7 @@ import {
   ShieldCheck,
   UserRoundCheck,
   Users,
+  Video,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -33,6 +37,12 @@ type MenuItem = {
   show: boolean;
 };
 
+type MenuGroup = {
+  key: string;
+  title: string;
+  items: MenuItem[];
+};
+
 function getRoleName(role?: string) {
   if (role === 'owner') return '站长';
   if (role === 'admin') return '管理员';
@@ -41,18 +51,9 @@ function getRoleName(role?: string) {
 }
 
 function getRoleBadgeClass(role?: string) {
-  if (role === 'owner') {
-    return 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-purple-500/30';
-  }
-
-  if (role === 'admin') {
-    return 'bg-blue-600 text-white shadow-blue-500/30';
-  }
-
-  if (role === 'editor') {
-    return 'bg-emerald-600 text-white shadow-emerald-500/30';
-  }
-
+  if (role === 'owner') return 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-purple-500/30';
+  if (role === 'admin') return 'bg-blue-600 text-white shadow-blue-500/30';
+  if (role === 'editor') return 'bg-emerald-600 text-white shadow-emerald-500/30';
   return 'bg-white/10 text-white';
 }
 
@@ -67,6 +68,12 @@ function canWrite(role?: string) {
 export function AdminShell({ children }: AdminShellProps) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    overview: true,
+    content: true,
+    manage: true,
+    system: true,
+  });
 
   const role = user?.role || 'user';
   const manager = isManager(role);
@@ -93,86 +100,66 @@ export function AdminShell({ children }: AdminShellProps) {
     };
   }, []);
 
-  const menus: MenuItem[] = [
+  const groups: MenuGroup[] = [
     {
+      key: 'overview',
       title: '概览',
-      to: '/admin',
-      icon: LayoutDashboard,
-      show: true,
+      items: [
+        { title: '概览', to: '/admin', icon: LayoutDashboard, show: true },
+      ],
     },
     {
-      title: '文章管理',
-      to: '/admin/posts',
-      icon: FileText,
-      show: writer,
+      key: 'content',
+      title: '内容管理',
+      items: [
+        { title: '文章管理', to: '/admin/posts', icon: FileText, show: writer },
+        { title: '写文章', to: '/admin/write', icon: PenLine, show: writer },
+        { title: '视频评审', to: '/admin/videos', icon: Video, show: writer },
+        { title: '媒体库', to: '/admin/media', icon: Image, show: writer },
+      ],
     },
     {
-      title: '写文章',
-      to: '/admin/write',
-      icon: PenLine,
-      show: writer,
+      key: 'manage',
+      title: '运营管理',
+      items: [
+        { title: '编辑申请审核', to: '/admin/editor-applications', icon: UserRoundCheck, show: manager },
+        { title: '评论管理', to: '/admin/comments', icon: MessageCircle, show: manager },
+        { title: '用户管理', to: '/admin/users', icon: Users, show: manager },
+        { title: '违禁词设置', to: '/admin/banned-words', icon: Ban, show: manager },
+      ],
     },
     {
-      title: '媒体库',
-      to: '/admin/media',
-      icon: Image,
-      show: writer,
+      key: 'system',
+      title: '系统设置',
+      items: [
+        { title: '运维监控', to: '/admin/router-monitor', icon: Activity, show: manager },
+        { title: '首页设置', to: '/admin/home-settings', icon: Home, show: manager },
+        { title: '公告管理', to: '/admin/announcements', icon: Megaphone, show: manager },
+        { title: '站点设置', to: '/admin/site-settings', icon: Settings, show: manager },
+        { title: '邮件设置', to: '/admin/mail-settings', icon: Mail, show: manager },
+        { title: '发送邮件', to: '/admin/send-mail', icon: Send, show: manager },
+        { title: '编辑申请', to: '/admin/editor-apply', icon: ShieldCheck, show: !writer },
+      ],
     },
-    {
-      title: '编辑申请审核',
-      to: '/admin/editor-applications',
-      icon: UserRoundCheck,
-      show: manager,
-    },
-    {
-      title: '评论管理',
-      to: '/admin/comments',
-      icon: MessageCircle,
-      show: manager,
-    },
-    {
-      title: '用户管理',
-      to: '/admin/users',
-      icon: Users,
-      show: manager,
-    },
-    {
-      title: '违禁词设置',
-      to: '/admin/banned-words',
-      icon: Ban,
-      show: manager,
-    },
-    {
-      title: '站点设置',
-      to: '/admin/site-settings',
-      icon: Settings,
-      show: manager,
-    },
-    {
-      title: '邮件设置',
-      to: '/admin/mail-settings',
-      icon: Mail,
-      show: manager,
-    },
-    {
-      title: '发送邮件',
-      to: '/admin/send-mail',
-      icon: Send,
-      show: manager,
-    },
-    {
-      title: '编辑申请',
-      to: '/admin/editor-apply',
-      icon: ShieldCheck,
-      show: !writer,
-    },
-  ].filter((item) => item.show);
+  ]
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.show),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const closeMobile = () => setMobileOpen(false);
 
   const handleLogout = () => {
     logout();
     closeMobile();
+  };
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((current) => ({
+      ...current,
+      [key]: !current[key],
+    }));
   };
 
   const MenuContent = ({ mobile = false }: { mobile?: boolean }) => (
@@ -201,11 +188,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
       <div className="mt-8 shrink-0 rounded-3xl bg-gradient-to-br from-gray-950 to-blue-950 p-5 text-white shadow-lg">
         <div className="text-sm text-white/70">当前用户</div>
-
-        <div className="mt-3 truncate font-bold">
-          {user?.username || '未登录'}
-        </div>
-
+        <div className="mt-3 truncate font-bold">{user?.username || '未登录'}</div>
         <div className="mt-3">
           <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold shadow-lg ${getRoleBadgeClass(role)}`}>
             {role === 'owner' && <Crown className="h-3.5 w-3.5" />}
@@ -214,28 +197,45 @@ export function AdminShell({ children }: AdminShellProps) {
         </div>
       </div>
 
-      <nav className="mt-6 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
-        {menus.map((item) => {
-          const Icon = item.icon;
+      <nav className="mt-6 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
+        {groups.map((group) => {
+          const opened = openGroups[group.key] !== false;
 
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/admin'}
-              onClick={() => mobile && closeMobile()}
-              className={({ isActive }) =>
-                [
-                  'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition',
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
-                ].join(' ')
-              }
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{item.title}</span>
-            </NavLink>
+            <div key={group.key} className="space-y-2">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.key)}
+                className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-xs font-semibold text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+              >
+                <span>{group.title}</span>
+                <ChevronDown className={`h-4 w-4 transition ${opened ? 'rotate-180' : ''}`} />
+              </button>
+
+              {opened && group.items.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/admin'}
+                    onClick={() => mobile && closeMobile()}
+                    className={({ isActive }) =>
+                      [
+                        'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition',
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                      ].join(' ')
+                    }
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.title}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
           );
         })}
 
@@ -281,9 +281,7 @@ export function AdminShell({ children }: AdminShellProps) {
             </div>
 
             <div className="min-w-0">
-              <div className="truncate text-sm font-bold text-gray-900">
-                后台管理
-              </div>
+              <div className="truncate text-sm font-bold text-gray-900">后台管理</div>
               <div className="truncate text-xs text-gray-500">
                 {user?.username || '未登录'} · {getRoleName(role)}
               </div>
@@ -291,19 +289,11 @@ export function AdminShell({ children }: AdminShellProps) {
           </Link>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1 rounded-2xl bg-gray-100 px-3 py-2 text-xs text-gray-700"
-            >
+            <Link to="/" className="inline-flex items-center gap-1 rounded-2xl bg-gray-100 px-3 py-2 text-xs text-gray-700">
               <Home className="h-4 w-4" />
               首页
             </Link>
-
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="inline-flex items-center gap-1 rounded-2xl bg-blue-600 px-3 py-2 text-xs text-white"
-            >
+            <button type="button" onClick={() => setMobileOpen(true)} className="inline-flex items-center gap-1 rounded-2xl bg-blue-600 px-3 py-2 text-xs text-white">
               <Menu className="h-4 w-4" />
               菜单
             </button>
@@ -313,25 +303,14 @@ export function AdminShell({ children }: AdminShellProps) {
 
       {mobileOpen && (
         <div className="fixed inset-0 z-[60] overflow-hidden lg:hidden">
-          <button
-            type="button"
-            aria-label="关闭菜单"
-            className="absolute inset-0 bg-black/40"
-            onClick={closeMobile}
-          />
-
+          <button type="button" aria-label="关闭菜单" className="absolute inset-0 bg-black/40" onClick={closeMobile} />
           <aside className="absolute inset-y-0 left-0 flex w-80 max-w-[86vw] flex-col overflow-hidden bg-white p-5 shadow-2xl">
             <div className="mb-5 flex shrink-0 items-center justify-between">
               <div className="text-sm font-semibold text-gray-500">后台菜单</div>
-              <button
-                type="button"
-                onClick={closeMobile}
-                className="rounded-xl bg-gray-100 p-2 text-gray-600"
-              >
+              <button type="button" onClick={closeMobile} className="rounded-xl bg-gray-100 p-2 text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
-
             <div className="h-[calc(100%-3.5rem)] min-h-0">
               <MenuContent mobile />
             </div>

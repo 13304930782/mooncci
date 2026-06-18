@@ -20,17 +20,6 @@ const defaultProfile = {
   email: '',
 };
 
-const defaultHero = {
-  badge: '',
-  title_before: '',
-  title_highlight: '',
-  title_after: '',
-  subtitle: '',
-  primary_text: '',
-  primary_link: '',
-  secondary_text: '',
-  secondary_link: '',
-};
 
 const defaultFooter = {
   copyright: '',
@@ -68,7 +57,6 @@ async function uploadImage(file: File) {
 export default function AdminSiteSettingsPage() {
   const [brand, setBrand] = useState(defaultBrand);
   const [profile, setProfile] = useState(defaultProfile);
-  const [hero, setHero] = useState(defaultHero);
   const [footer, setFooter] = useState(defaultFooter);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -80,7 +68,6 @@ export default function AdminSiteSettingsPage() {
       .then((data) => {
         setBrand({ ...defaultBrand, ...(data.brand || {}) });
         setProfile({ ...defaultProfile, ...(data.profile || {}) });
-        setHero({ ...defaultHero, ...(data.hero || {}) });
         setFooter({ ...defaultFooter, ...(data.footer || {}) });
       })
       .catch(() => setMessage('站点资料加载失败'));
@@ -94,9 +81,6 @@ export default function AdminSiteSettingsPage() {
     setProfile((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateHero = (key: string, value: string) => {
-    setHero((prev) => ({ ...prev, [key]: value }));
-  };
 
   const updateFooter = (key: string, value: string) => {
     setFooter((prev) => ({ ...prev, [key]: value }));
@@ -109,7 +93,7 @@ export default function AdminSiteSettingsPage() {
     try {
       await api('/settings/site', {
         method: 'PUT',
-        body: JSON.stringify({ brand, profile, hero, footer }),
+        body: JSON.stringify({ brand, profile, footer }),
       });
 
       setMessage('保存成功');
@@ -160,109 +144,10 @@ export default function AdminSiteSettingsPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">站点资料设置</h1>
           <p className="mt-2 text-sm text-gray-500">
-            修改首页 Hero、侧边栏资料、头像、社交链接和底部备案信息。
+            管理浏览器标题、Logo、侧边栏个人资料和底部备案信息；首页内容请到“首页设置”。
           </p>
         </div>
 
-
-        <section className="mb-6 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm leading-6 text-gray-700">
-          <div>
-            <h2 className="font-semibold text-gray-900">运维与安全检查</h2>
-            <p className="mt-1 text-gray-500">
-              这些命令只在维护时使用，默认折叠，避免占用站点设置页面空间。
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            <details className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
-              <summary className="cursor-pointer font-medium">首页首屏显示和重新打包</summary>
-              <p className="mt-3">
-                修改站点标题、首页 Hero、备案、页脚、Logo 或 favicon 后，如果希望刷新首页第一眼就是新内容，执行：
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-amber-950 px-4 py-3 text-xs leading-5 text-amber-50">{`cd /www/wwwroot/mooncci-source
-./scripts/rebuild-site-settings.sh`}</pre>
-              <p className="mt-3">
-                脚本会拉取最新站点设置、生成 <code className="rounded bg-amber-100 px-1">initialSiteSettings.ts</code>、
-                执行 <code className="rounded bg-amber-100 px-1">npm run build</code> 并部署前端静态文件，不需要重启 PM2。
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-amber-950 px-4 py-3 text-xs leading-5 text-amber-50">{`1. GET https://mooncci.site/api/settings/site
-2. 写入 src/app/config/initialSiteSettings.ts
-3. 执行 npm run build
-4. 备份并替换 /www/wwwroot/mooncci.site/index.html
-5. 同步 dist/assets 到 /www/wwwroot/mooncci.site/assets`}</pre>
-            </details>
-
-            <details className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
-              <summary className="cursor-pointer font-medium">安全冒烟测试</summary>
-              <p className="mt-3">
-                修改接口、登录认证、权限、评论、上传、媒体库或部署配置后，执行下面脚本快速检查核心链路。
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-blue-950 px-4 py-3 text-xs leading-5 text-blue-50">{`cd /www/wwwroot/mooncci-source
-
-SMOKE_BASE_URL="https://mooncci.site" \\
-SMOKE_EMAIL="你的登录邮箱" \\
-SMOKE_PASSWORD="你的登录密码" \\
-SMOKE_POST_ID="7" \\
-node scripts/smoke-test.mjs`}</pre>
-              <p className="mt-3">
-                脚本会检查健康接口、写接口来源保护、登录 Cookie、当前用户身份、站点设置、文章列表、媒体库、
-                管理接口权限、评论列表和退出登录；不会修改业务数据。
-              </p>
-            </details>
-
-            <details className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
-              <summary className="cursor-pointer font-medium">数据库迁移</summary>
-              <p className="mt-3">
-                新增字段、索引或表结构时，把 SQL 放到
-                <code className="rounded bg-emerald-100 px-1">server/database/migrations</code>，再统一执行：
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-emerald-950 px-4 py-3 text-xs leading-5 text-emerald-50">{`cd /www/wwwroot/mooncci-source/server
-
-node scripts/migrate.js --dry-run
-node scripts/migrate.js`}</pre>
-              <p className="mt-3">
-                执行前先备份数据库；已执行过的 migration 不要再改，下一次结构调整新建按时间命名的 SQL 文件。
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-emerald-950 px-4 py-3 text-xs leading-5 text-emerald-50">{`server/database/migrations/202605210001_add_xxx.sql
-server/database/migrations/202605210002_create_xxx_table.sql`}</pre>
-            </details>
-
-            <details className="rounded-2xl border border-purple-200 bg-purple-50 px-4 py-3 text-purple-900">
-              <summary className="cursor-pointer font-medium">高风险模块定期复查</summary>
-              <p className="mt-3">
-                邮件、上传、Markdown、评论和权限接口改动后，或每月例行维护时，执行只读复查脚本：
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-purple-950 px-4 py-3 text-xs leading-5 text-purple-50">{`cd /www/wwwroot/mooncci-source
-
-./scripts/high-risk-review.sh`}</pre>
-              <p className="mt-3">
-                脚本只读取代码、检查响应头、扫描异常上传扩展名和常见敏感字符串，不会修改数据库、文章、评论、用户或媒体文件。
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-purple-950 px-4 py-3 text-xs leading-5 text-purple-50">{`1. /api/health 安全响应头和缓存
-2. 写接口 X-Requested-With 来源保护
-3. 上传类型、magic number、压缩逻辑和异常扩展名
-4. Markdown 安全链接和 HTML 渲染点
-5. 评论审核、回复、删除、点赞、IP 脱敏
-6. 邮件发送、SMTP 设置和发送接口权限
-7. 源码敏感字符串扫描，排除真实 .env
-8. PM2 进程状态`}</pre>
-            </details>
-
-            <details className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-900">
-              <summary className="cursor-pointer font-medium">公开文章发布前脱敏检查</summary>
-              <p className="mt-3">
-                发布复盘、教程、审计总结或公开文档前，先用这个脚本扫描真实路径、邮箱、IP、Token、密钥痕迹和内部部署细节。
-              </p>
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-rose-950 px-4 py-3 text-xs leading-5 text-rose-50">{`cd /www/wwwroot/mooncci-source
-
-./scripts/public-doc-scan.sh docs/your-article.md`}</pre>
-              <p className="mt-3">
-                如果输出为空，说明没有扫到明显敏感信息；如果有输出，先把真实目录、账号、邮箱、IP、端口、进程名和密钥痕迹改成泛化描述。
-                截图里的地址栏、终端路径和账号也要手动检查。
-              </p>
-            </details>
-          </div>
-        </section>
 
         {message && (
           <div className="mb-5 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -348,57 +233,6 @@ server/database/migrations/202605210002_create_xxx_table.sql`}</pre>
           </div>
         </section>
 
-
-        <section className="rounded-3xl border border-gray-200 bg-white/70 p-6">
-          <h2 className="text-xl font-semibold text-gray-900">首页 Hero 设置</h2>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="md:col-span-2">
-              <label className="block mb-2 text-sm font-medium text-gray-700">小标签</label>
-              <input value={hero.badge} onChange={(e) => updateHero('badge', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">标题前半部分</label>
-              <input value={hero.title_before} onChange={(e) => updateHero('title_before', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">高亮文字</label>
-              <input value={hero.title_highlight} onChange={(e) => updateHero('title_highlight', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">标题后半部分</label>
-              <input value={hero.title_after} onChange={(e) => updateHero('title_after', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">副标题</label>
-              <input value={hero.subtitle} onChange={(e) => updateHero('subtitle', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">主按钮文字</label>
-              <input value={hero.primary_text} onChange={(e) => updateHero('primary_text', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">主按钮链接</label>
-              <input value={hero.primary_link} onChange={(e) => updateHero('primary_link', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">副按钮文字</label>
-              <input value={hero.secondary_text} onChange={(e) => updateHero('secondary_text', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-700">副按钮链接</label>
-              <input value={hero.secondary_link} onChange={(e) => updateHero('secondary_link', e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-          </div>
-        </section>
 
         <section className="mt-6 rounded-3xl border border-gray-200 bg-white/70 p-6">
           <h2 className="text-xl font-semibold text-gray-900">侧边栏个人资料</h2>

@@ -1,0 +1,899 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const FileType = require('file-type');
+const db = require('../db');
+const { authRequired, adminOnly, editorOrAdmin, isAdminLike } = require('../middleware/auth');
+
+const router = express.Router();
+const videoDir = path.join(__dirname, '../../uploads/videos');
+
+if (!fs.existsSync(videoDir)) {
+  fs.mkdirSync(videoDir, { recursive: true });
+}
+
+const allowedVideoExts = ['.mp4', '.webm', '.mov'];
+const allowedVideoMimes = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'application/octet-stream',
+];
+
+const detectedVideoTypes = {
+  mp4: { ext: '.mp4', mime: 'video/mp4' },
+  webm: { ext: '.webm', mime: 'video/webm' },
+  mov: { ext: '.mov', mime: 'video/quicktime' },
+};
+
+const sourceTypes = new Set(['local', 'direct', 'embed']);
+
+function cleanString(value, max = 500) {
+  return String(value || '').trim().slice(0, max);
+}
+
+function cleanStatus(value, fallback = 'draft') {
+  return ['draft', 'published'].includes(value) ? value : fallback;
+}
+
+function cleanSourceType(value, fallback = 'local') {
+  const next = cleanString(value, 20).toLowerCase();
+  return sourceTypes.has(next) ? next : fallback;
+}
+
+function clampScore(value) {
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 1 || score > 10) return null;
+  return score;
+}
+
+function safeBasename(filename) {
+  return path.basename(String(filename || '')).trim();
+}
+
+function toPublicVideoUrl(filename) {
+  return `/api/videos/files/${safeBasename(filename)}`;
+}
+
+function videoPathFor(filename) {
+  return path.join(videoDir, safeBasename(filename));
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (!size) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function removeFile(filePath) {
+  try {
+    fs.unlinkSync(filePath);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.error('[videos] remove file failed:', err.message);
+    }
+  }
+}
+
+function isAllowedVideo(file) {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  return allowedVideoExts.includes(ext) && allowedVideoMimes.includes(file.mimetype);
+}
+
+async function validateVideoFile(filePath, originalName) {
+  const originalExt = path.extname(originalName || '').toLowerCase();
+  const detected = await FileType.fromFile(filePath);
+
+  if (!detected) {
+    return { ok: originalExt === '.mp4', ext: originalExt, mime: 'video/mp4' };
+  }
+
+  const mapped = detectedVideoTypes[detected.ext];
+  if (!mapped || !allowedVideoExts.includes(mapped.ext)) {
+    return { ok: false, detected };
+  }
+
+  return { ok: true, ext: mapped.ext, mime: mapped.mime };
+}
+
+function extractIframeSrc(value) {
+  const text = cleanString(value, 4000).replace(/&amp;/g, '&');
+  const match = text.match(/src=["']([^"']+)["']/i);
+  return match ? match[1] : text;
+}
+
+function parseHttpUrl(value) {
+  const raw = extractIframeSrc(value);
+  if (!raw) return null;
+
+  try {
+    const url = new URL(raw.startsWith('//') ? `https:${raw}` : raw);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeYouTube(url) {
+  const host = url.hostname.replace(/^www\./, '').toLowerCase();
+  const parts = url.pathname.split('/').filter(Boolean);
+  let id = '';
+
+  if (host === 'youtu.be') {
+    id = parts[0] || '';
+  } else if (host === 'youtube.com' || host === 'youtube-nocookie.com' || host.endsWith('.youtube.com')) {
+    if (parts[0] === 'embed') id = parts[1] || '';
+    if (parts[0] === 'shorts') id = parts[1] || '';
+    if (parts[0] === 'live') id = parts[1] || '';
+    if (!id) id = url.searchParams.get('v') || '';
+  }
+
+  id = id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+  if (!id) return null;
+
+  return {
+    embed_url: `https://www.youtube-nocookie.com/embed/${id}`,
+    provider: 'youtube',
+  };
+}
+
+function normalizeBilibili(url) {
+  const host = url.hostname.toLowerCase();
+
+  if (host === 'player.bilibili.com') {
+    url.protocol = 'https:';
+    url.searchParams.set('autoplay', url.searchParams.get('autoplay') || '0');
+    return { embed_url: url.toString(), provider: 'bilibili' };
+  }
+
+  if (!host.endsWith('bilibili.com')) return null;
+
+  const match = url.pathname.match(/\/video\/(BV[a-zA-Z0-9]+|av\d+)/i);
+  if (!match) return null;
+
+  const videoId = match[1];
+  const player = new URL('https://player.bilibili.com/player.html');
+  if (videoId.toLowerCase().startsWith('bv')) {
+    player.searchParams.set('bvid', videoId);
+  } else {
+    player.searchParams.set('aid', videoId.replace(/^av/i, ''));
+  }
+  const page = url.searchParams.get('p');
+  if (page) player.searchParams.set('page', page);
+  player.searchParams.set('autoplay', '0');
+
+  return { embed_url: player.toString(), provider: 'bilibili' };
+}
+
+function normalizeEmbedUrl(value) {
+  const url = parseHttpUrl(value);
+  if (!url) return null;
+
+  const youtube = normalizeYouTube(url);
+  if (youtube) return youtube;
+
+  const bilibili = normalizeBilibili(url);
+  if (bilibili) return bilibili;
+
+  return {
+    embed_url: url.toString(),
+    provider: cleanString(url.hostname.replace(/^www\./, ''), 40) || 'embed',
+  };
+}
+
+function normalizeDirectUrl(value) {
+  const url = parseHttpUrl(value);
+  if (!url) return '';
+  return url.toString().slice(0, 800);
+}
+
+function sourceLabel(row) {
+  const type = cleanSourceType(row.source_type);
+  if (type === 'embed') {
+    if (row.provider === 'youtube') return 'YouTube 嵌入';
+    if (row.provider === 'bilibili') return 'B站嵌入';
+    return '第三方嵌入';
+  }
+  if (type === 'direct') return '外部直链';
+  return '本地上传';
+}
+
+function getFirstValue(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return '';
+}
+
+function normalizeSourcePayload(body, current = null) {
+  const rawSourceType = getFirstValue(
+    body.source_type,
+    body.sourceType,
+    body.video_source,
+    body.videoSource,
+    body.source
+  );
+  const directInput = getFirstValue(
+    body.video_url,
+    body.videoUrl,
+    body.external_url,
+    body.externalUrl,
+    body.externalVideoUrl,
+    body.direct_url,
+    body.directUrl,
+    body.url
+  );
+  const embedInput = getFirstValue(
+    body.embed_url,
+    body.embedUrl,
+    body.iframe_url,
+    body.iframeUrl,
+    body.embed,
+    body.iframe
+  );
+
+  let source_type = cleanSourceType(rawSourceType, current?.source_type || 'local');
+
+  if (!rawSourceType) {
+    if (embedInput) {
+      source_type = 'embed';
+    } else if (directInput) {
+      source_type = 'direct';
+    }
+  }
+
+  if (source_type === 'embed') {
+    const normalized = normalizeEmbedUrl(embedInput || directInput);
+    if (!normalized) {
+      const error = new Error('请填写有效的第三方嵌入链接，支持 B站、YouTube iframe/分享链接，也支持其他 https iframe 地址');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      source_type,
+      video_url: null,
+      video_filename: null,
+      video_mime: null,
+      video_size: null,
+      embed_url: normalized.embed_url,
+      provider: cleanString(body.provider || body.providerName || normalized.provider, 40),
+    };
+  }
+
+  if (source_type === 'direct') {
+    const video_url = normalizeDirectUrl(directInput);
+    if (!video_url) {
+      const error = new Error('请填写有效的外部 MP4/WebM/MOV 直链，必须是 http 或 https 地址');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      source_type,
+      video_url,
+      video_filename: null,
+      video_mime: null,
+      video_size: null,
+      embed_url: null,
+      provider: cleanString(body.provider || body.providerName || 'direct', 40),
+    };
+  }
+
+  return {
+    source_type: 'local',
+    video_url: current?.source_type === 'local' ? current.video_url || null : null,
+    video_filename: current?.source_type === 'local' ? current.video_filename || null : null,
+    video_mime: current?.source_type === 'local' ? current.video_mime || null : null,
+    video_size: current?.source_type === 'local' ? current.video_size || null : null,
+    embed_url: null,
+    provider: null,
+  };
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, videoDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeExt = allowedVideoExts.includes(ext) ? ext : '.mp4';
+    cb(null, `${Date.now()}-${Math.random().toString(16).slice(2)}${safeExt}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: Number(process.env.VIDEO_UPLOAD_LIMIT_MB || 512) * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (!isAllowedVideo(file)) {
+      return cb(new Error('只允许上传 mp4、webm、mov 视频文件'));
+    }
+    cb(null, true);
+  },
+});
+
+function mapVideoRow(row) {
+  return {
+    ...row,
+    source_type: cleanSourceType(row.source_type),
+    source_label: sourceLabel(row),
+    score_count: Number(row.score_count || 0),
+    avg_total_score: row.avg_total_score == null ? null : Number(row.avg_total_score),
+    avg_content_score: row.avg_content_score == null ? null : Number(row.avg_content_score),
+    avg_delivery_score: row.avg_delivery_score == null ? null : Number(row.avg_delivery_score),
+    avg_technical_score: row.avg_technical_score == null ? null : Number(row.avg_technical_score),
+    avg_defense_score: row.avg_defense_score == null ? null : Number(row.avg_defense_score),
+    video_size_text: formatFileSize(row.video_size),
+  };
+}
+
+function buildVideoSummarySql(whereSql = '') {
+  return `
+    SELECT
+      v.*,
+      u.username AS creator_name,
+      COALESCE(sc.score_count, 0) AS score_count,
+      sc.avg_total_score,
+      sc.avg_content_score,
+      sc.avg_delivery_score,
+      sc.avg_technical_score,
+      sc.avg_defense_score
+    FROM videos v
+    LEFT JOIN users u ON u.id = v.created_by
+    LEFT JOIN (
+      SELECT
+        video_id,
+        COUNT(id) AS score_count,
+        ROUND(AVG(content_score + delivery_score + technical_score + defense_score), 2) AS avg_total_score,
+        ROUND(AVG(content_score), 2) AS avg_content_score,
+        ROUND(AVG(delivery_score), 2) AS avg_delivery_score,
+        ROUND(AVG(technical_score), 2) AS avg_technical_score,
+        ROUND(AVG(defense_score), 2) AS avg_defense_score
+      FROM video_scores
+      GROUP BY video_id
+    ) sc ON sc.video_id = v.id
+    ${whereSql}
+  `;
+}
+
+async function fetchVideo(id, includeDraft = false) {
+  const where = includeDraft ? 'WHERE v.id=?' : 'WHERE v.id=? AND v.status="published"';
+  const [rows] = await db.query(
+    `${buildVideoSummarySql(where)} LIMIT 1`,
+    [id]
+  );
+  return rows[0] ? mapVideoRow(rows[0]) : null;
+}
+
+
+const scoreWeights = {
+  content: 0.30,
+  technical: 0.30,
+  delivery: 0.20,
+  defense: 0.20,
+};
+
+function roundNumber(value, digits = 2) {
+  if (value == null || Number.isNaN(Number(value))) return null;
+  const factor = 10 ** digits;
+  return Math.round(Number(value) * factor) / factor;
+}
+
+function weightedScore(row) {
+  return (
+    Number(row.content_score || 0) * scoreWeights.content +
+    Number(row.technical_score || 0) * scoreWeights.technical +
+    Number(row.delivery_score || 0) * scoreWeights.delivery +
+    Number(row.defense_score || 0) * scoreWeights.defense
+  );
+}
+
+function average(values) {
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function stddev(values, avg) {
+  if (!values.length || avg == null) return null;
+  const variance = values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+function buildRankingRows(videos, scoreRows) {
+  const grouped = new Map();
+
+  scoreRows.forEach((row) => {
+    const key = Number(row.video_id);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+
+  const maxScoreCount = Math.max(...videos.map((video) => Number(video.score_count || 0)), 0);
+
+  const rows = videos.map((video) => {
+    const scores = grouped.get(Number(video.id)) || [];
+    const weightedScores = scores.map(weightedScore).filter((value) => Number.isFinite(value));
+    const scoreCount = weightedScores.length;
+
+    const weightedAvg = average(weightedScores);
+    const trimmedScores = [...weightedScores].sort((a, b) => a - b);
+    const effectiveScores = trimmedScores.length >= 5 ? trimmedScores.slice(1, -1) : trimmedScores;
+    const trimmedWeightedAvg = average(effectiveScores);
+    const scoreStddev = stddev(weightedScores, weightedAvg);
+
+    const avgContent = average(scores.map((row) => Number(row.content_score || 0)));
+    const avgDelivery = average(scores.map((row) => Number(row.delivery_score || 0)));
+    const avgTechnical = average(scores.map((row) => Number(row.technical_score || 0)));
+    const avgDefense = average(scores.map((row) => Number(row.defense_score || 0)));
+
+    // 最终排名分：主体是全班加权均分；人数和稳定度只做小幅校正；最后用维度小权重拆平分。
+    // 这样不会因为同分而全挤在一起，也不会让随机 id 影响排名。
+    const baseScore100 = trimmedWeightedAvg == null ? null : trimmedWeightedAvg * 10;
+    const participationBonus = maxScoreCount > 0 ? Math.min(scoreCount / maxScoreCount, 1) * 0.30 : 0;
+    const consistencyBonus = scoreStddev == null ? 0 : Math.max(0, 1 - Math.min(scoreStddev / 2.5, 1)) * 0.20;
+    const tieBreaker = scoreCount > 0
+      ? Number(avgTechnical || 0) * 0.003 + Number(avgContent || 0) * 0.002 + Number(avgDelivery || 0) * 0.001 + Number(avgDefense || 0) * 0.0005 + scoreCount * 0.0001
+      : 0;
+    const finalScore = baseScore100 == null ? null : baseScore100 + participationBonus + consistencyBonus + tieBreaker;
+
+    return {
+      id: video.id,
+      title: video.title,
+      team_name: video.team_name || '',
+      speaker_names: video.speaker_names || '',
+      status: video.status,
+      source_label: video.source_label,
+      score_count: scoreCount,
+      avg_content_score: roundNumber(avgContent, 2),
+      avg_delivery_score: roundNumber(avgDelivery, 2),
+      avg_technical_score: roundNumber(avgTechnical, 2),
+      avg_defense_score: roundNumber(avgDefense, 2),
+      weighted_score: roundNumber(weightedAvg == null ? null : weightedAvg * 10, 3),
+      trimmed_weighted_score: roundNumber(baseScore100, 3),
+      score_stddev: roundNumber(scoreStddev, 3),
+      participation_bonus: roundNumber(participationBonus, 3),
+      consistency_bonus: roundNumber(consistencyBonus, 3),
+      tie_breaker: roundNumber(tieBreaker, 4),
+      final_score: roundNumber(finalScore, 3),
+    };
+  });
+
+  rows.sort((a, b) => {
+    if (a.final_score == null && b.final_score == null) return Number(a.id) - Number(b.id);
+    if (a.final_score == null) return 1;
+    if (b.final_score == null) return -1;
+    return b.final_score - a.final_score;
+  });
+
+  let rank = 0;
+  return rows.map((row) => {
+    if (row.final_score != null) rank += 1;
+    return { ...row, rank: row.final_score == null ? null : rank };
+  });
+}
+
+async function fetchAdminVideos(user) {
+  const where = isAdminLike(user) ? '' : 'WHERE v.created_by=?';
+  const params = isAdminLike(user) ? [] : [user.id];
+  const [rows] = await db.query(
+    `
+    ${buildVideoSummarySql(where)}
+    ORDER BY v.updated_at DESC, v.id DESC
+    LIMIT 300
+    `,
+    params
+  );
+  return rows.map(mapVideoRow);
+}
+
+async function fetchRankingRows(user) {
+  const videos = await fetchAdminVideos(user);
+  const videoIds = videos.map((video) => Number(video.id));
+  if (!videoIds.length) return [];
+
+  const [scoreRows] = await db.query(
+    `
+    SELECT
+      s.*,
+      u.username
+    FROM video_scores s
+    LEFT JOIN users u ON u.id = s.user_id
+    WHERE s.video_id IN (?)
+    ORDER BY s.video_id ASC, s.updated_at ASC
+    `,
+    [videoIds]
+  );
+
+  return buildRankingRows(videos, scoreRows);
+}
+
+function csvCell(value) {
+  const text = value == null ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function buildRankingCsv(rows) {
+  const headers = [
+    '排名',
+    '视频标题',
+    '分组',
+    '主讲人',
+    '评分人数',
+    '最终排名分',
+    '加权均分',
+    '去极值均分',
+    '内容均分',
+    '表达均分',
+    '技术均分',
+    '答辩均分',
+    '标准差',
+    '人数加成',
+    '稳定度加成',
+    '拆分同分小权重',
+    '状态',
+  ];
+
+  const lines = [headers.map(csvCell).join(',')];
+
+  rows.forEach((row) => {
+    lines.push([
+      row.rank || '',
+      row.title,
+      row.team_name,
+      row.speaker_names,
+      row.score_count,
+      row.final_score,
+      row.weighted_score,
+      row.trimmed_weighted_score,
+      row.avg_content_score,
+      row.avg_delivery_score,
+      row.avg_technical_score,
+      row.avg_defense_score,
+      row.score_stddev,
+      row.participation_bonus,
+      row.consistency_bonus,
+      row.tie_breaker,
+      row.status === 'published' ? '已发布' : '草稿',
+    ].map(csvCell).join(','));
+  });
+
+  lines.push('');
+  lines.push(['权重说明', '内容30% + 技术30% + 表达20% + 答辩20%；5人及以上自动去掉一个最高和一个最低；人数和稳定度仅做小幅校正；维度小权重用于拆分同分。'].map(csvCell).join(','));
+
+  return `\ufeff${lines.join('\n')}`;
+}
+
+router.use('/files', express.static(videoDir, {
+  acceptRanges: true,
+  maxAge: '7d',
+  immutable: false,
+  setHeaders(res) {
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+  },
+}));
+
+router.get('/', async (_req, res) => {
+  try {
+    const [rows] = await db.query(`
+      ${buildVideoSummarySql('WHERE v.status="published"')}
+      ORDER BY v.sort_order ASC, v.published_at DESC, v.created_at DESC
+      LIMIT 200
+    `);
+    res.json(rows.map(mapVideoRow));
+  } catch (err) {
+    console.error('[videos/list]', err);
+    res.status(500).json({ message: '视频列表加载失败' });
+  }
+});
+
+router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
+  try {
+    res.json(await fetchRankingRows(req.user));
+  } catch (err) {
+    console.error('[videos/admin/rankings]', err);
+    res.status(500).json({ message: '评分排名加载失败' });
+  }
+});
+
+router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) => {
+  try {
+    const rows = await fetchRankingRows(req.user);
+    const csv = buildRankingCsv(rows);
+    const filename = `video-ranking-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    console.error('[videos/admin/rankings/export]', err);
+    res.status(500).json({ message: '评分导出失败' });
+  }
+});
+
+router.get('/admin', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    res.json(await fetchAdminVideos(req.user));
+  } catch (err) {
+    console.error('[videos/admin/list]', err);
+    res.status(500).json({ message: '后台视频列表加载失败' });
+  }
+});
+
+router.get('/admin/:id/scores', authRequired, adminOnly, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+
+    const [rows] = await db.query(
+      `
+      SELECT
+        s.*,
+        u.username,
+        (s.content_score + s.delivery_score + s.technical_score + s.defense_score) AS total_score
+      FROM video_scores s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.video_id=?
+      ORDER BY s.updated_at DESC
+      `,
+      [req.params.id]
+    );
+
+    res.json({ video, scores: rows });
+  } catch (err) {
+    console.error('[videos/admin/scores]', err);
+    res.status(500).json({ message: '评分明细加载失败' });
+  }
+});
+
+router.get('/:id', async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, false);
+    if (!video) return res.status(404).json({ message: '视频不存在或尚未发布' });
+    res.json(video);
+  } catch (err) {
+    console.error('[videos/detail]', err);
+    res.status(500).json({ message: '视频详情加载失败' });
+  }
+});
+
+router.get('/:id/my-score', authRequired, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM video_scores WHERE video_id=? AND user_id=? LIMIT 1', [req.params.id, req.user.id]);
+    res.json(rows[0] || null);
+  } catch (err) {
+    console.error('[videos/my-score]', err);
+    res.status(500).json({ message: '评分加载失败' });
+  }
+});
+
+router.post('/', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    const title = cleanString(req.body.title, 255);
+    if (!title) return res.status(400).json({ message: '视频标题不能为空' });
+
+    const status = cleanStatus(req.body.status);
+    const publishedAt = status === 'published' ? new Date() : null;
+    const source = normalizeSourcePayload(req.body);
+
+    const [result] = await db.query(
+      `
+      INSERT INTO videos
+      (title, summary, team_name, speaker_names, source_type, video_url, video_filename, video_mime, video_size, embed_url, provider, cover_image, status, sort_order, created_by, published_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        title,
+        cleanString(req.body.summary, 2000),
+        cleanString(req.body.team_name, 120),
+        cleanString(req.body.speaker_names, 255),
+        source.source_type,
+        source.video_url,
+        source.video_filename,
+        source.video_mime,
+        source.video_size,
+        source.embed_url,
+        source.provider,
+        cleanString(req.body.cover_image, 500),
+        status,
+        Number.parseInt(req.body.sort_order, 10) || 0,
+        req.user.id,
+        publishedAt,
+      ]
+    );
+
+    res.json(await fetchVideo(result.insertId, true));
+  } catch (err) {
+    console.error('[videos/create]', err);
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : '视频创建失败' });
+  }
+});
+
+router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+    if (!isAdminLike(req.user) && Number(video.created_by) !== Number(req.user.id)) {
+      return res.status(403).json({ message: '无权限编辑这个视频' });
+    }
+
+    const title = cleanString(req.body.title, 255);
+    if (!title) return res.status(400).json({ message: '视频标题不能为空' });
+
+    const status = cleanStatus(req.body.status, video.status);
+    const publishedAt = status === 'published' ? (video.published_at || new Date()) : null;
+    const source = normalizeSourcePayload(req.body, video);
+
+    if (source.source_type !== 'local' && video.video_filename) {
+      removeFile(videoPathFor(video.video_filename));
+    }
+
+    await db.query(
+      `
+      UPDATE videos
+      SET title=?, summary=?, team_name=?, speaker_names=?, source_type=?, video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=?, provider=?, cover_image=?, status=?, sort_order=?, published_at=?
+      WHERE id=?
+      `,
+      [
+        title,
+        cleanString(req.body.summary, 2000),
+        cleanString(req.body.team_name, 120),
+        cleanString(req.body.speaker_names, 255),
+        source.source_type,
+        source.video_url,
+        source.video_filename,
+        source.video_mime,
+        source.video_size,
+        source.embed_url,
+        source.provider,
+        cleanString(req.body.cover_image, 500),
+        status,
+        Number.parseInt(req.body.sort_order, 10) || 0,
+        publishedAt,
+        req.params.id,
+      ]
+    );
+
+    res.json(await fetchVideo(req.params.id, true));
+  } catch (err) {
+    console.error('[videos/update]', err);
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : '视频保存失败' });
+  }
+});
+
+router.post('/:id/file', authRequired, editorOrAdmin, (req, res) => {
+  upload.single('video')(req, res, async (err) => {
+    if (err) return res.status(400).json({ message: err.message || '视频上传失败' });
+    if (!req.file) return res.status(400).json({ message: '没有收到视频文件' });
+
+    try {
+      const video = await fetchVideo(req.params.id, true);
+      if (!video) {
+        removeFile(req.file.path);
+        return res.status(404).json({ message: '视频不存在' });
+      }
+      if (!isAdminLike(req.user) && Number(video.created_by) !== Number(req.user.id)) {
+        removeFile(req.file.path);
+        return res.status(403).json({ message: '无权限上传这个视频' });
+      }
+
+      const validation = await validateVideoFile(req.file.path, req.file.originalname);
+      if (!validation.ok) {
+        removeFile(req.file.path);
+        return res.status(400).json({ message: '视频内容校验失败' });
+      }
+
+      if (validation.ext && path.extname(req.file.filename).toLowerCase() !== validation.ext) {
+        const nextFilename = `${path.basename(req.file.filename, path.extname(req.file.filename))}${validation.ext}`;
+        const nextPath = path.join(videoDir, nextFilename);
+        fs.renameSync(req.file.path, nextPath);
+        req.file.filename = nextFilename;
+        req.file.path = nextPath;
+      }
+
+      if (video.video_filename) {
+        removeFile(videoPathFor(video.video_filename));
+      }
+
+      const stat = fs.statSync(req.file.path);
+      await db.query(
+        'UPDATE videos SET source_type="local", video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=NULL, provider=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=?',
+        [
+          toPublicVideoUrl(req.file.filename),
+          req.file.filename,
+          validation.mime || req.file.mimetype,
+          stat.size,
+          req.params.id,
+        ]
+      );
+
+      res.json(await fetchVideo(req.params.id, true));
+    } catch (uploadErr) {
+      removeFile(req.file.path);
+      console.error('[videos/upload]', uploadErr);
+      res.status(500).json({ message: '视频上传失败' });
+    }
+  });
+});
+
+router.post('/:id/score', authRequired, async (req, res) => {
+  try {
+    if (!['owner', 'admin', 'editor'].includes(req.user.role) && Number(req.user.can_comment) !== 1) {
+      return res.status(403).json({ message: '当前账号不能评分' });
+    }
+
+    const video = await fetchVideo(req.params.id, false);
+    if (!video) return res.status(404).json({ message: '视频不存在或尚未发布' });
+
+    const scores = {
+      content: clampScore(req.body.content_score),
+      delivery: clampScore(req.body.delivery_score),
+      technical: clampScore(req.body.technical_score),
+      defense: clampScore(req.body.defense_score),
+    };
+
+    if (Object.values(scores).some((score) => score == null)) {
+      return res.status(400).json({ message: '每个维度都需要 1-10 分' });
+    }
+
+    await db.query(
+      `
+      INSERT INTO video_scores
+      (video_id, user_id, content_score, delivery_score, technical_score, defense_score, comment)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        content_score=VALUES(content_score),
+        delivery_score=VALUES(delivery_score),
+        technical_score=VALUES(technical_score),
+        defense_score=VALUES(defense_score),
+        comment=VALUES(comment),
+        updated_at=CURRENT_TIMESTAMP
+      `,
+      [
+        req.params.id,
+        req.user.id,
+        scores.content,
+        scores.delivery,
+        scores.technical,
+        scores.defense,
+        cleanString(req.body.comment, 2000),
+      ]
+    );
+
+    res.json({ message: '评分已保存', video: await fetchVideo(req.params.id, false) });
+  } catch (err) {
+    console.error('[videos/score]', err);
+    res.status(500).json({ message: '评分保存失败' });
+  }
+});
+
+router.delete('/:id', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+    if (!isAdminLike(req.user) && Number(video.created_by) !== Number(req.user.id)) {
+      return res.status(403).json({ message: '无权限删除这个视频' });
+    }
+
+    if (video.video_filename) {
+      removeFile(videoPathFor(video.video_filename));
+    }
+
+    await db.query('DELETE FROM videos WHERE id=?', [req.params.id]);
+    res.json({ message: '视频已删除' });
+  } catch (err) {
+    console.error('[videos/delete]', err);
+    res.status(500).json({ message: '视频删除失败' });
+  }
+});
+
+module.exports = {
+  router,
+  videoDir,
+};

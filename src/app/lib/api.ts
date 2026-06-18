@@ -14,6 +14,7 @@ export async function api(path: string, options: RequestInit = {}) {
 
   const res = await fetch(`/api${path}`, {
     ...options,
+    cache: options.cache || 'no-store',
     credentials: 'same-origin',
     headers,
   });

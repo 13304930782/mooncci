@@ -1,126 +1,183 @@
+import { ArrowRight, Calendar, Clock, GraduationCap } from 'lucide-react';
 import { motion } from 'motion/react';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
-import { initialSiteSettings } from '../config/initialSiteSettings';
-import { isExternalHttpUrl, safeHref, safeRoutePath } from '../lib/safeUrl';
+import { defaultHomeSettings, type HomeSettings } from '../lib/homeContent';
 
-const defaultHero = {
-  badge: '欢迎来到我的技术博客',
-  title_before: '探索',
-  title_highlight: '编程',
-  title_after: '之美',
-  subtitle: '分享前端、后端、算法、系统设计等计算机领域的知识与经验',
-  primary_text: '开始阅读',
-  primary_link: '/articles',
-  secondary_text: '了解更多',
-  secondary_link: '/categories',
+type HeroProps = {
+  featuredPost?: any;
+  settings?: HomeSettings;
 };
 
-function SmartButton({
+function parseTags(raw: unknown): string[] {
+  try {
+    if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+    return JSON.parse(String(raw || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+function SmartLink({
   to,
+  className,
   children,
-  primary = false,
 }: {
   to: string;
-  children: React.ReactNode;
-  primary?: boolean;
+  className: string;
+  children: ReactNode;
 }) {
-  const className = primary
-    ? 'inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-7 py-3 text-white font-medium shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/35 transition-all'
-    : 'inline-flex items-center gap-2 rounded-full bg-white/70 dark:bg-gray-900/70 px-7 py-3 text-gray-700 dark:text-gray-200 font-medium border border-gray-200/60 dark:border-gray-800 hover:bg-white dark:hover:bg-gray-900 transition-all';
+  const target = to || '/articles';
 
-  const externalHref = isExternalHttpUrl(to) ? safeHref(to, '') : '';
-
-  if (externalHref) {
+  if (target.startsWith('http://') || target.startsWith('https://') || target.startsWith('#')) {
     return (
-      <a href={externalHref} target="_blank" rel="noreferrer" className={className}>
+      <a href={target} className={className}>
         {children}
       </a>
     );
   }
 
   return (
-    <Link to={safeRoutePath(to)} className={className}>
+    <Link to={target} className={className}>
       {children}
     </Link>
   );
 }
 
-export function Hero() {
-  const [hero, setHero] = useState({ ...defaultHero, ...(initialSiteSettings.hero || {}) });
-
-  useEffect(() => {
-    api('/settings/site')
-      .then((data) => setHero({ ...defaultHero, ...(data.hero || {}) }))
-      .catch(() => {});
-  }, []);
+const Hero = ({ featuredPost, settings }: HeroProps) => {
+  const tags = parseTags(featuredPost?.tags).slice(0, 3);
+  const home = { ...defaultHomeSettings, ...(settings || {}) };
+  const chips = home.hero_chips?.length ? home.hero_chips : defaultHomeSettings.hero_chips;
 
   return (
-    <section className="relative overflow-hidden px-6 pt-36 pb-20">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute right-10 top-40 h-72 w-72 rounded-full bg-purple-500/20 blur-3xl" />
+    <section
+      id="hero"
+      className="relative overflow-hidden border-b border-slate-200/70 px-4 pb-7 pt-24 dark:border-slate-800/70 sm:px-6 md:pt-28"
+    >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute left-[-8rem] top-8 h-72 w-72 rounded-full bg-blue-200/20 blur-3xl dark:bg-blue-900/20" />
+        <div className="absolute right-[-8rem] top-20 h-64 w-64 rounded-full bg-slate-200/30 blur-3xl dark:bg-slate-800/30" />
       </div>
 
-      <div className="relative mx-auto max-w-5xl text-center">
-        {hero.badge && (
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-            className="inline-flex items-center gap-2 rounded-full bg-white/70 dark:bg-gray-900/70 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border border-gray-200/60 dark:border-gray-800 backdrop-blur"
-          >
-            <Sparkles className="h-4 w-4 text-purple-600" />
-            {hero.badge}
-          </motion.div>
-        )}
-
-        <motion.h1
-          initial={{ opacity: 0, y: 26 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-8 text-5xl md:text-7xl font-bold tracking-tight text-gray-900 dark:text-white"
-        >
-          {hero.title_before}
-          <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">
-            {hero.title_highlight}
-          </span>
-          {hero.title_after}
-        </motion.h1>
-
-        {hero.subtitle && (
-          <motion.p
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.16, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="mx-auto mt-7 max-w-3xl text-lg leading-8 text-gray-600 dark:text-gray-300"
-          >
-            {hero.subtitle}
-          </motion.p>
-        )}
-
+      <div className="relative mx-auto grid max-w-7xl items-center gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <motion.div
-          initial={{ opacity: 0, y: 22 }}
+          initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.24, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-10 flex flex-wrap items-center justify-center gap-4"
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          {hero.primary_text && (
-            <SmartButton to={hero.primary_link || '/articles'} primary>
-              {hero.primary_text}
-              <ArrowRight className="h-4 w-4" />
-            </SmartButton>
-          )}
+          <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-blue-100 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-700 shadow-sm shadow-blue-900/5 backdrop-blur dark:border-blue-900/50 dark:bg-slate-900/80 dark:text-blue-300">
+            <GraduationCap className="h-4 w-4" />
+            {home.hero_eyebrow}
+          </div>
 
-          {hero.secondary_text && (
-            <SmartButton to={hero.secondary_link || '/categories'}>
-              {hero.secondary_text}
-            </SmartButton>
-          )}
+          <h1 className="mt-5 max-w-3xl text-5xl font-black leading-[1.06] tracking-[-0.055em] text-slate-950 dark:text-white md:text-[3.75rem] lg:text-[4.25rem]">
+            {home.hero_title}
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-xl font-semibold leading-8 tracking-[-0.02em] text-slate-800 dark:text-slate-100 md:text-2xl">
+            {home.hero_subtitle}
+          </p>
+
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+            {home.hero_description}
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <SmartLink
+              to={home.primary_cta_url}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:bg-white dark:text-slate-950"
+            >
+              {home.primary_cta_label}
+              <ArrowRight className="h-4 w-4" />
+            </SmartLink>
+
+            <SmartLink
+              to={home.secondary_cta_url}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white/70 px-5 py-2.5 text-sm font-semibold text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-900/50 dark:bg-slate-900/70 dark:text-blue-200"
+            >
+              {home.secondary_cta_label}
+            </SmartLink>
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-2.5 text-sm text-slate-500 dark:text-slate-400">
+            {chips.map((item) => (
+              <span
+                key={item}
+                className="rounded-lg bg-white/70 px-3 py-1.5 shadow-sm shadow-slate-950/5 dark:bg-slate-900/70"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
         </motion.div>
+
+        <motion.article
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-xl border border-white/80 border-l-[3px] border-l-blue-600 bg-white/80 p-4 shadow-lg shadow-blue-950/10 backdrop-blur dark:border-slate-800 dark:border-l-blue-500 dark:bg-slate-900/80 md:p-5 lg:mt-6 lg:self-start"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-600 dark:text-blue-300">
+              Featured Article
+            </p>
+            <span className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-bold text-white">
+              {home.featured_badge}
+            </span>
+          </div>
+
+          <h2 className="text-xl font-bold leading-tight tracking-[-0.03em] text-slate-950 dark:text-white md:text-2xl">
+            {featuredPost?.title || home.featured_fallback_title}
+          </h2>
+
+          <p className="mt-3 line-clamp-3 text-[13px] leading-6 text-slate-600 dark:text-slate-300">
+            {featuredPost?.summary || home.featured_fallback_summary}
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {tags.length > 0 ? (
+              tags.map((tag) => (
+                <Link
+                  key={tag}
+                  to={'/tag/' + encodeURIComponent(tag)}
+                  className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 transition hover:bg-blue-50 hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  {tag}
+                </Link>
+              ))
+            ) : (
+              <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800">
+                技术笔记
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 text-xs dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-3 text-slate-500 dark:text-slate-400">
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {featuredPost?.created_at?.slice(0, 10) || 'Mooncci Blog'}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                约 3 分钟阅读
+              </span>
+            </div>
+
+            <Link
+              to={featuredPost?.id ? '/article/' + featuredPost.id : '/articles'}
+              className="group relative inline-flex w-fit items-center gap-2 font-bold text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              阅读全文
+              <ArrowRight className="h-4 w-4" />
+              <span className="absolute -bottom-1 left-0 h-px w-full origin-left scale-x-0 bg-blue-600 transition-transform group-hover:scale-x-100" />
+            </Link>
+          </div>
+        </motion.article>
       </div>
     </section>
   );
-}
+};
+
+export { Hero };
+export default Hero;

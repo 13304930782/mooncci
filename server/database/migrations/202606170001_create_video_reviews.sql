@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS `videos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `summary` text,
+  `team_name` varchar(120) DEFAULT NULL,
+  `speaker_names` varchar(255) DEFAULT NULL,
+  `video_url` varchar(500) DEFAULT NULL,
+  `video_filename` varchar(255) DEFAULT NULL,
+  `video_mime` varchar(100) DEFAULT NULL,
+  `video_size` bigint(20) unsigned DEFAULT NULL,
+  `cover_image` varchar(500) DEFAULT NULL,
+  `status` enum('draft','published') NOT NULL DEFAULT 'draft',
+  `sort_order` int(11) NOT NULL DEFAULT '0',
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `published_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_videos_status_sort` (`status`,`sort_order`,`created_at`),
+  KEY `idx_videos_created_by` (`created_by`),
+  CONSTRAINT `fk_videos_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `video_scores` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `video_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `content_score` tinyint(3) unsigned NOT NULL,
+  `delivery_score` tinyint(3) unsigned NOT NULL,
+  `technical_score` tinyint(3) unsigned NOT NULL,
+  `defense_score` tinyint(3) unsigned NOT NULL,
+  `comment` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_video_score_user` (`video_id`,`user_id`),
+  KEY `idx_video_scores_user` (`user_id`),
+  CONSTRAINT `fk_video_scores_video` FOREIGN KEY (`video_id`) REFERENCES `videos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_video_scores_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
