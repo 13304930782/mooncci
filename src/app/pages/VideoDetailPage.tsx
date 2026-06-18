@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { BarChart3, CheckCircle2, LogIn, Star } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
 
 type VideoDetail = {
   id: number;
   title: string;
   summary?: string;
   team_name?: string;
+  class_code?: string;
+  class_label?: string;
+  allowed_class_labels?: string[];
+  allowed_class_codes?: string[];
   speaker_names?: string;
   source_type?: 'local' | 'direct' | 'embed';
   source_label?: string;
@@ -53,19 +58,19 @@ const emptyScore: ScoreForm = {
 type ScoreKey = Exclude<keyof ScoreForm, 'comment'>;
 
 function formatScore(value?: number | null) {
-  if (value == null) return '暂无';
+  if (value == null) return '鏆傛棤';
   return Number(value).toFixed(1);
 }
 
 function getSourceLabel(video: VideoDetail) {
   if (video.source_label) return video.source_label;
   if (video.source_type === 'embed') {
-    if (video.provider === 'youtube') return 'YouTube 嵌入';
+    if (video.provider === 'youtube') return 'YouTube 宓屽叆';
     if (video.provider === 'bilibili') return 'B站嵌入';
     return '第三方嵌入';
   }
-  if (video.source_type === 'direct') return '外部直链';
-  return '本地上传';
+  if (video.source_type === 'direct') return '澶栭儴鐩撮摼';
+  return '鏈湴涓婁紶';
 }
 
 function VideoPlayer({ video }: { video: VideoDetail }) {
@@ -97,13 +102,15 @@ function VideoPlayer({ video }: { video: VideoDetail }) {
 
   return (
     <div className="flex aspect-video items-center justify-center bg-slate-950 text-sm text-white/70">
-      视频地址尚未配置
+      瑙嗛鍦板潃灏氭湭閰嶇疆
     </div>
   );
 }
 
 export default function VideoDetailPage() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [form, setForm] = useState<ScoreForm>(emptyScore);
@@ -111,6 +118,9 @@ export default function VideoDetailPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [scorerName, setScorerName] = useState('');
+  const [scorerGroupName, setScorerGroupName] = useState('');
+  const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
+  const selectedClassLabel = getVideoClassLabel(selectedClassCode);
 
   const totalScore = useMemo(
     () => form.content_score + form.delivery_score + form.technical_score + form.defense_score,
@@ -137,7 +147,7 @@ export default function VideoDetailPage() {
           });
         }
       })
-      .catch((err) => setMessage(err.message || '视频加载失败'))
+      .catch((err) => setMessage(err.message || '瑙嗛鍔犺浇澶辫触'))
       .finally(() => setLoading(false));
   };
 
@@ -155,9 +165,20 @@ export default function VideoDetailPage() {
 
     const publicScoring = Number(video.public_scoring_enabled || 0) === 1;
     const normalizedScorerName = scorerName.trim().replace(/\s+/g, ' ');
+    const normalizedScorerGroupName = scorerGroupName.trim().replace(/\s+/g, ' ');
 
     if (publicScoring && !normalizedScorerName) {
       setMessage('请先填写姓名。');
+      return;
+    }
+
+    if (publicScoring && !selectedClassCode) {
+      setMessage('请先选择你的班级。');
+      return;
+    }
+
+    if (publicScoring && !normalizedScorerGroupName) {
+      setMessage('请先填写你的小组。');
       return;
     }
 
@@ -168,12 +189,17 @@ export default function VideoDetailPage() {
       setMessage('');
       const result = await api(publicScoring ? `/videos/${id}/public-score` : `/videos/${id}/score`, {
         method: 'POST',
-        body: JSON.stringify(publicScoring ? { ...form, scorer_name: normalizedScorerName } : form),
+        body: JSON.stringify(publicScoring ? {
+          ...form,
+          scorer_name: normalizedScorerName,
+          scorer_class_code: selectedClassCode,
+          scorer_group_name: normalizedScorerGroupName,
+        } : form),
       });
       setVideo(result.video);
       setMessage(publicScoring ? '评分已提交，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
     } catch (err: any) {
-      setMessage(err.message || '评分保存失败');
+      setMessage(err.message || '璇勫垎淇濆瓨澶辫触');
     } finally {
       setSaving(false);
     }
@@ -187,12 +213,12 @@ export default function VideoDetailPage() {
 
       <main className="mx-auto max-w-7xl px-4 pb-10 pt-28 sm:px-6 lg:pt-32">
         <Link to="/videos" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">
-          返回视频栏目
+          杩斿洖瑙嗛鏍忕洰
         </Link>
 
         {loading && (
           <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/75 p-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/75">
-            正在加载视频...
+            姝ｅ湪鍔犺浇瑙嗛...
           </div>
         )}
 
@@ -228,13 +254,13 @@ export default function VideoDetailPage() {
               <section className="rounded-xl border border-slate-200/70 bg-white/85 p-5 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/85">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                   <BarChart3 className="h-4 w-4 text-blue-600" />
-                  实时统计
+                  瀹炴椂缁熻
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-lg bg-blue-50 p-3 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
-                    <div className="text-xs opacity-80">综合均分</div>
+                    <div className="text-xs opacity-80">缁煎悎鍧囧垎</div>
                     <div className="mt-1 text-2xl font-black">{formatScore(video.avg_total_score)}</div>
-                    <div className="mt-1 text-xs opacity-80">满分 40</div>
+                    <div className="mt-1 text-xs opacity-80">婊″垎 40</div>
                   </div>
                   <div className="rounded-lg bg-slate-100 p-3 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     <div className="text-xs opacity-80">评分人数</div>
@@ -253,33 +279,60 @@ export default function VideoDetailPage() {
               <section className="rounded-xl border border-slate-200/70 bg-white/85 p-5 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/85">
                 <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                   <Star className="h-4 w-4 text-blue-600" />
-                  我的评分
+                  鎴戠殑璇勫垎
                 </div>
 
                 {!publicScoringEnabled && !user ? (
                   <div className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    登录后可以评分和填写点评。
+                    鐧诲綍鍚庡彲浠ヨ瘎鍒嗗拰濉啓鐐硅瘎銆?
                     <Link to={`/login?redirect=/videos/${id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">
                       <LogIn className="h-4 w-4" />
-                      去登录
+                      鍘荤櫥褰?
                     </Link>
                   </div>
                 ) : (
                   <div className="mt-4 space-y-4">
                     {publicScoringEnabled && (
-                      <label className="block rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
-                        <div className="text-sm font-semibold text-slate-900 dark:text-white">姓名（必填）</div>
+                      <div className="block rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                        <div className="mb-4 grid gap-3">
+                          <label className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">鐝骇锛堝繀閫夛級</div>
+                            <select
+                              value={selectedClassCode}
+                              onChange={(event) => {
+                                const next = event.target.value;
+                                setSearchParams(next ? { class: next } : {});
+                              }}
+                              className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
+                            >
+                              <option value="">璇烽€夋嫨鐝骇</option>
+                              {videoClassOptions.map((item) => (
+                                <option key={item.code} value={item.code}>{item.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">灏忕粍锛堝繀濉級</div>
+                            <input
+                              value={scorerGroupName}
+                              onChange={(event) => setScorerGroupName(event.target.value)}
+                              maxLength={100}
+                              className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
+                              placeholder="Example: Group 1"
+                            />
+                          </label>
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">濮撳悕锛堝繀濉級</div>
                         <input
                           value={scorerName}
                           onChange={(event) => setScorerName(event.target.value)}
                           maxLength={100}
                           className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
-                          placeholder="请填写自己的姓名"
+                          placeholder="璇峰～鍐欒嚜宸辩殑濮撳悕"
                         />
                         <p className="mt-2 text-xs leading-5 text-blue-700 dark:text-blue-200">
-                          同一个视频，同一个姓名只能提交一次评分。
-                        </p>
-                      </label>
+                          鍚屼竴涓棰戯紝鍚屼竴涓鍚嶅彧鑳芥彁浜や竴娆¤瘎鍒嗐€?                        </p>
+                      </div>
                     )}
 
                     {dimensions.map((item) => (
@@ -309,13 +362,13 @@ export default function VideoDetailPage() {
                     </div>
 
                     <label className="block">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">点评</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">鐐硅瘎</div>
                       <textarea
                         value={form.comment}
                         onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
                         rows={4}
                         className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950"
-                        placeholder="写下亮点、问题或改进建议"
+                        placeholder="鍐欎笅浜偣銆侀棶棰樻垨鏀硅繘寤鸿"
                       />
                     </label>
 
@@ -326,7 +379,7 @@ export default function VideoDetailPage() {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      {saving ? '保存中...' : '提交评分'}
+                      {saving ? '淇濆瓨涓?..' : '鎻愪氦璇勫垎'}
                     </button>
                   </div>
                 )}

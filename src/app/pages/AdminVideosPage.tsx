@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart3, Download, ExternalLink, FileVideo, Link2, Plus, RefreshCw, Trash2, Trophy, Upload, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { getVideoClassLabel, videoClassOptions } from '../lib/videoClasses';
 
 type SourceType = 'local' | 'direct' | 'embed';
 
@@ -11,6 +12,10 @@ type VideoRow = {
   title: string;
   summary?: string;
   team_name?: string;
+  class_code?: string;
+  class_label?: string;
+  allowed_class_codes?: string[];
+  allowed_class_labels?: string[];
   speaker_names?: string;
   source_type?: SourceType;
   source_label?: string;
@@ -33,6 +38,8 @@ type VideoRow = {
 type ScoreRow = {
   id: number;
   username: string;
+  scorer_class_code?: string;
+  scorer_group_name?: string;
   content_score: number;
   delivery_score: number;
   technical_score: number;
@@ -48,6 +55,8 @@ type RankingRow = {
   id: number;
   title: string;
   team_name?: string;
+  class_code?: string;
+  class_label?: string;
   speaker_names?: string;
   status: 'draft' | 'published';
   score_count: number;
@@ -69,6 +78,8 @@ type FormState = {
   title: string;
   summary: string;
   team_name: string;
+  class_code: string;
+  allowed_class_codes: string[];
   speaker_names: string;
   source_type: SourceType;
   video_url: string;
@@ -84,6 +95,8 @@ const emptyForm: FormState = {
   title: '',
   summary: '',
   team_name: '',
+  class_code: '',
+  allowed_class_codes: [],
   speaker_names: '',
   source_type: 'local',
   video_url: '',
@@ -166,15 +179,27 @@ export default function AdminVideosPage() {
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [rankings, setRankings] = useState<RankingRow[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingVideoClass, setRankingVideoClass] = useState('');
+  const [rankingScorerClass, setRankingScorerClass] = useState('');
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
   const manager = user?.role === 'owner' || user?.role === 'admin';
+  const rankingExportUrl = useMemo(() => {
+    const query = new URLSearchParams();
+    if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
+    if (rankingScorerClass) query.set('scorer_class_code', rankingScorerClass);
+    return `/api/videos/admin/rankings/export${query.toString() ? `?${query.toString()}` : ''}`;
+  }, [rankingVideoClass, rankingScorerClass]);
 
   const loadRankings = () => {
     if (!manager) return;
 
+    const query = new URLSearchParams();
+    if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
+    if (rankingScorerClass) query.set('scorer_class_code', rankingScorerClass);
+
     setRankingLoading(true);
-    api('/videos/admin/rankings')
+    api(`/videos/admin/rankings${query.toString() ? `?${query.toString()}` : ''}`)
       .then((rows) => setRankings(Array.isArray(rows) ? rows : []))
       .catch((err) => setMessage(err.message || '评分排名加载失败'))
       .finally(() => setRankingLoading(false));
@@ -189,7 +214,7 @@ export default function AdminVideosPage() {
   useEffect(() => {
     loadVideos();
     loadRankings();
-  }, [manager]);
+  }, [manager, rankingVideoClass, rankingScorerClass]);
 
   useEffect(() => {
     if (!message) {
@@ -223,12 +248,26 @@ export default function AdminVideosPage() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const toggleAllowedClass = (classCode: string) => {
+    setForm((current) => {
+      const next = new Set(current.allowed_class_codes);
+      if (next.has(classCode)) {
+        next.delete(classCode);
+      } else {
+        next.add(classCode);
+      }
+      return { ...current, allowed_class_codes: Array.from(next) };
+    });
+  };
+
   const startEdit = (video: VideoRow) => {
     setForm({
       id: video.id,
       title: video.title || '',
       summary: video.summary || '',
       team_name: video.team_name || '',
+      class_code: video.class_code || '',
+      allowed_class_codes: Array.isArray(video.allowed_class_codes) ? video.allowed_class_codes : [],
       speaker_names: video.speaker_names || '',
       source_type: video.source_type || 'local',
       video_url: video.video_url || '',
@@ -260,6 +299,10 @@ export default function AdminVideosPage() {
         title: form.title.trim(),
         summary: form.summary.trim(),
         team_name: form.team_name.trim(),
+        class_code: form.class_code,
+        classCode: form.class_code,
+        allowed_class_codes: form.allowed_class_codes,
+        allowedClassCodes: form.allowed_class_codes,
         speaker_names: form.speaker_names.trim(),
         source_type: form.source_type,
         sourceType: form.source_type,
@@ -408,6 +451,26 @@ export default function AdminVideosPage() {
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
+              <select
+                value={rankingVideoClass}
+                onChange={(event) => setRankingVideoClass(event.target.value)}
+                className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
+              >
+                <option value="">全部视频班级</option>
+                {videoClassOptions.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </select>
+              <select
+                value={rankingScorerClass}
+                onChange={(event) => setRankingScorerClass(event.target.value)}
+                className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
+              >
+                <option value="">全部评分班级</option>
+                {videoClassOptions.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={loadRankings}
@@ -417,7 +480,7 @@ export default function AdminVideosPage() {
                 {rankingLoading ? '刷新中' : '刷新排名'}
               </button>
               <a
-                href="/api/videos/admin/rankings/export"
+                href={rankingExportUrl}
                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
               >
                 <Download className="h-4 w-4" />
@@ -492,6 +555,35 @@ export default function AdminVideosPage() {
               <span className="text-sm font-semibold text-gray-700">分组/小组</span>
               <input value={form.team_name} onChange={(event) => update('team_name', event.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="例如：第六组" />
             </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-gray-700">所属班级</span>
+              <select
+                value={form.class_code}
+                onChange={(event) => update('class_code', event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="">暂不设置</option>
+                {videoClassOptions.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-gray-700">允许评分班级</div>
+              <p className="mt-1 text-xs text-gray-500">不勾选时默认四个班级入口都可以评分；勾选后只允许选中的班级评分。</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {videoClassOptions.map((item) => (
+                  <label key={item.code} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.allowed_class_codes.includes(item.code)}
+                      onChange={() => toggleAllowedClass(item.code)}
+                    />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </div>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">主讲人</span>
               <input value={form.speaker_names} onChange={(event) => update('speaker_names', event.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="多个名字用顿号或逗号分隔" />
@@ -636,6 +728,11 @@ export default function AdminVideosPage() {
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                         {getSourceLabel(video)}
                       </span>
+                      {(video.class_label || video.class_code) && (
+                        <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                          {video.class_label || getVideoClassLabel(video.class_code)}
+                        </span>
+                      )}
                       {Number(video.public_scoring_enabled || 0) === 1 && (
                         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                           免登录评分已开
@@ -644,6 +741,9 @@ export default function AdminVideosPage() {
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
                       {video.team_name || '未填写分组'} · {video.speaker_names || '未填写主讲人'} · {video.video_size_text || (video.source_type === 'embed' ? '第三方播放器' : video.source_type === 'direct' ? '外部直链' : '未上传视频')}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      允许评分：{video.allowed_class_labels?.length ? video.allowed_class_labels.join('、') : '全部班级'}
                     </p>
                     <p className="mt-2 line-clamp-2 text-sm text-gray-600">{video.summary || '暂无简介'}</p>
                     <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-600">
@@ -712,6 +812,8 @@ export default function AdminVideosPage() {
               <thead className="text-xs text-gray-500">
                 <tr className="border-b">
                   <th className="py-3 pr-4">用户</th>
+                  <th className="py-3 pr-4">评分班级</th>
+                  <th className="py-3 pr-4">评分小组</th>
                   <th className="py-3 pr-4">总分</th>
                   <th className="py-3 pr-4">内容</th>
                   <th className="py-3 pr-4">表达</th>
@@ -724,6 +826,8 @@ export default function AdminVideosPage() {
                 {scores.map((score) => (
                   <tr key={score.id} className="border-b last:border-0">
                     <td className="py-3 pr-4 font-semibold text-gray-900">{score.username}</td>
+                    <td className="py-3 pr-4">{getVideoClassLabel(score.scorer_class_code) || '-'}</td>
+                    <td className="py-3 pr-4">{score.scorer_group_name || '-'}</td>
                     <td className="py-3 pr-4 font-bold text-blue-700">{score.total_score}</td>
                     <td className="py-3 pr-4">{score.content_score}</td>
                     <td className="py-3 pr-4">{score.delivery_score}</td>
@@ -734,7 +838,7 @@ export default function AdminVideosPage() {
                 ))}
                 {scores.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-gray-500">暂无评分</td>
+                    <td colSpan={9} className="py-6 text-center text-gray-500">暂无评分</td>
                   </tr>
                 )}
               </tbody>

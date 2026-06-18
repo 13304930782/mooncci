@@ -28,6 +28,13 @@ const detectedVideoTypes = {
 };
 
 const sourceTypes = new Set(['local', 'direct', 'embed']);
+const classOptions = [
+  { code: 'software-24-7', label: '软件24-7' },
+  { code: 'software-24-8', label: '软件24-8' },
+  { code: 'software-24-9', label: '软件24-9' },
+  { code: 'software-24-10', label: '软件24-10' },
+];
+const classCodes = new Set(classOptions.map((item) => item.code));
 
 function cleanString(value, max = 500) {
   return String(value || '').trim().slice(0, max);
@@ -43,6 +50,37 @@ function cleanBoolean(value) {
 
 function cleanScorerName(value) {
   return cleanString(value, 100).replace(/\s+/g, ' ');
+}
+
+function cleanClassCode(value) {
+  const code = cleanString(value, 40).toLowerCase();
+  return classCodes.has(code) ? code : '';
+}
+
+function classLabel(code) {
+  return classOptions.find((item) => item.code === code)?.label || '';
+}
+
+function cleanAllowedClasses(value) {
+  const input = Array.isArray(value)
+    ? value
+    : String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  return [...new Set(input.map(cleanClassCode).filter(Boolean))];
+}
+
+function cleanGroupName(value) {
+  return cleanString(value, 100).replace(/\s+/g, ' ');
+}
+
+function normalizeGroupName(value) {
+  return cleanGroupName(value)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[()（）【】\[\]{}]/g, '');
 }
 
 function cleanSourceType(value, fallback = 'local') {
@@ -119,9 +157,35 @@ async function ensurePublicScoringSchemaOnce() {
     await db.query('ALTER TABLE videos ADD COLUMN public_scoring_enabled TINYINT NOT NULL DEFAULT 0 AFTER cover_image');
   }
 
+  if (!(await columnExists('videos', 'class_code'))) {
+    await db.query('ALTER TABLE videos ADD COLUMN class_code VARCHAR(40) NOT NULL DEFAULT "" AFTER team_name');
+  }
+
   if (!(await columnExists('video_scores', 'scorer_name'))) {
     await db.query('ALTER TABLE video_scores ADD COLUMN scorer_name VARCHAR(100) NULL AFTER user_id');
   }
+
+  if (!(await columnExists('video_scores', 'scorer_class_code'))) {
+    await db.query('ALTER TABLE video_scores ADD COLUMN scorer_class_code VARCHAR(40) NULL AFTER scorer_name');
+  }
+
+  if (!(await columnExists('video_scores', 'scorer_group_name'))) {
+    await db.query('ALTER TABLE video_scores ADD COLUMN scorer_group_name VARCHAR(100) NULL AFTER scorer_class_code');
+  }
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS video_allowed_classes (
+      id INT NOT NULL AUTO_INCREMENT,
+      video_id INT NOT NULL,
+      class_code VARCHAR(40) NOT NULL,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uniq_video_allowed_class (video_id, class_code),
+      KEY idx_video_allowed_class (class_code),
+      CONSTRAINT fk_video_allowed_classes_video
+        FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
 
   const [userIdColumns] = await db.query(
     `
@@ -136,12 +200,16 @@ async function ensurePublicScoringSchemaOnce() {
     await db.query('ALTER TABLE video_scores MODIFY COLUMN user_id INT(11) DEFAULT NULL');
   }
 
-  if (!(await indexExists('video_scores', 'uniq_video_scorer_name'))) {
+  if (await indexExists('video_scores', 'uniq_video_scorer_name')) {
+    await db.query('DROP INDEX uniq_video_scorer_name ON video_scores');
+  }
+
+  if (!(await indexExists('video_scores', 'uniq_video_scorer_class_name'))) {
     try {
-      await db.query('CREATE UNIQUE INDEX uniq_video_scorer_name ON video_scores (video_id, scorer_name)');
+      await db.query('CREATE UNIQUE INDEX uniq_video_scorer_class_name ON video_scores (video_id, scorer_class_code, scorer_name)');
     } catch (err) {
       if (err?.code === 'ER_DUP_ENTRY') {
-        console.warn('[videos/schema] skip uniq_video_scorer_name because duplicate scorer names already exist');
+        console.warn('[videos/schema] skip uniq_video_scorer_class_name because duplicate scorer names already exist');
       } else {
         throw err;
       }
@@ -402,10 +470,19 @@ const upload = multer({
 });
 
 function mapVideoRow(row) {
+  const allowedClassCodes = String(row.allowed_class_codes || '')
+    .split(',')
+    .map((item) => cleanClassCode(item))
+    .filter(Boolean);
+
   return {
     ...row,
     source_type: cleanSourceType(row.source_type),
     source_label: sourceLabel(row),
+    class_code: cleanClassCode(row.class_code),
+    class_label: classLabel(cleanClassCode(row.class_code)),
+    allowed_class_codes: [...new Set(allowedClassCodes)],
+    allowed_class_labels: [...new Set(allowedClassCodes)].map(classLabel).filter(Boolean),
     score_count: Number(row.score_count || 0),
     avg_total_score: row.avg_total_score == null ? null : Number(row.avg_total_score),
     avg_content_score: row.avg_content_score == null ? null : Number(row.avg_content_score),
@@ -433,6 +510,13 @@ function buildVideoSummarySql(whereSql = '') {
     LEFT JOIN (
       SELECT
         video_id,
+        GROUP_CONCAT(class_code ORDER BY class_code SEPARATOR ',') AS allowed_class_codes
+      FROM video_allowed_classes
+      GROUP BY video_id
+    ) ac ON ac.video_id = v.id
+    LEFT JOIN (
+      SELECT
+        video_id,
         COUNT(id) AS score_count,
         ROUND(AVG(content_score + delivery_score + technical_score + defense_score), 2) AS avg_total_score,
         ROUND(AVG(content_score), 2) AS avg_content_score,
@@ -453,6 +537,35 @@ async function fetchVideo(id, includeDraft = false) {
     [id]
   );
   return rows[0] ? mapVideoRow(rows[0]) : null;
+}
+
+async function saveAllowedClasses(videoId, allowedClasses) {
+  await db.query('DELETE FROM video_allowed_classes WHERE video_id=?', [videoId]);
+
+  if (!allowedClasses.length) return;
+
+  await db.query(
+    'INSERT INTO video_allowed_classes (video_id, class_code) VALUES ?',
+    [allowedClasses.map((classCode) => [videoId, classCode])]
+  );
+}
+
+async function classCanScoreVideo(videoId, classCode) {
+  const [countRows] = await db.query(
+    'SELECT COUNT(*) AS count FROM video_allowed_classes WHERE video_id=?',
+    [videoId]
+  );
+
+  if (Number(countRows[0]?.count || 0) === 0) {
+    return true;
+  }
+
+  const [rows] = await db.query(
+    'SELECT id FROM video_allowed_classes WHERE video_id=? AND class_code=? LIMIT 1',
+    [videoId, classCode]
+  );
+
+  return Boolean(rows[0]);
 }
 
 
@@ -529,6 +642,8 @@ function buildRankingRows(videos, scoreRows) {
     return {
       id: video.id,
       title: video.title,
+      class_code: video.class_code || '',
+      class_label: video.class_label || '',
       team_name: video.team_name || '',
       speaker_names: video.speaker_names || '',
       status: video.status,
@@ -562,12 +677,24 @@ function buildRankingRows(videos, scoreRows) {
   });
 }
 
-async function fetchAdminVideos(user) {
-  const where = isAdminLike(user) ? '' : 'WHERE v.created_by=?';
-  const params = isAdminLike(user) ? [] : [user.id];
+async function fetchAdminVideos(user, filters = {}) {
+  const where = [];
+  const params = [];
+
+  if (!isAdminLike(user)) {
+    where.push('v.created_by=?');
+    params.push(user.id);
+  }
+
+  const videoClassCode = cleanClassCode(filters.video_class_code || filters.class_code);
+  if (videoClassCode) {
+    where.push('v.class_code=?');
+    params.push(videoClassCode);
+  }
+
   const [rows] = await db.query(
     `
-    ${buildVideoSummarySql(where)}
+    ${buildVideoSummarySql(where.length ? `WHERE ${where.join(' AND ')}` : '')}
     ORDER BY v.updated_at DESC, v.id DESC
     LIMIT 300
     `,
@@ -576,10 +703,19 @@ async function fetchAdminVideos(user) {
   return rows.map(mapVideoRow);
 }
 
-async function fetchRankingRows(user) {
-  const videos = await fetchAdminVideos(user);
+async function fetchRankingRows(user, filters = {}) {
+  const videos = await fetchAdminVideos(user, filters);
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
+
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code);
+  const where = ['s.video_id IN (?)'];
+  const params = [videoIds];
+
+  if (scorerClassCode) {
+    where.push('s.scorer_class_code=?');
+    params.push(scorerClassCode);
+  }
 
   const [scoreRows] = await db.query(
     `
@@ -588,10 +724,10 @@ async function fetchRankingRows(user) {
       COALESCE(u.username, s.scorer_name) AS username
     FROM video_scores s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.video_id IN (?)
+    WHERE ${where.join(' AND ')}
     ORDER BY s.video_id ASC, s.updated_at ASC
     `,
-    [videoIds]
+    params
   );
 
   return buildRankingRows(videos, scoreRows);
@@ -606,6 +742,7 @@ function buildRankingCsv(rows) {
   const headers = [
     '排名',
     '视频标题',
+    '所属班级',
     '分组',
     '主讲人',
     '评分人数',
@@ -629,6 +766,7 @@ function buildRankingCsv(rows) {
     lines.push([
       row.rank || '',
       row.title,
+      row.class_label || classLabel(row.class_code) || '',
       row.team_name,
       row.speaker_names,
       row.score_count,
@@ -672,13 +810,32 @@ router.use(async (_req, res, next) => {
   }
 });
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.query(`
-      ${buildVideoSummarySql('WHERE v.status="published"')}
+    const classCode = cleanClassCode(req.query.class_code || req.query.class);
+    const where = classCode
+      ? `WHERE v.status="published" AND (
+          v.class_code=?
+          OR EXISTS (
+            SELECT 1 FROM video_allowed_classes vac
+            WHERE vac.video_id=v.id AND vac.class_code=?
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM video_allowed_classes vac_any
+            WHERE vac_any.video_id=v.id
+          )
+        )`
+      : 'WHERE v.status="published"';
+    const params = classCode ? [classCode, classCode] : [];
+
+    const [rows] = await db.query(
+      `
+      ${buildVideoSummarySql(where)}
       ORDER BY v.sort_order ASC, v.published_at DESC, v.created_at DESC
       LIMIT 200
-    `);
+      `,
+      params
+    );
     res.json(rows.map(mapVideoRow));
   } catch (err) {
     console.error('[videos/list]', err);
@@ -688,7 +845,7 @@ router.get('/', async (_req, res) => {
 
 router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
   try {
-    res.json(await fetchRankingRows(req.user));
+    res.json(await fetchRankingRows(req.user, req.query));
   } catch (err) {
     console.error('[videos/admin/rankings]', err);
     res.status(500).json({ message: '评分排名加载失败' });
@@ -697,7 +854,7 @@ router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
 
 router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) => {
   try {
-    const rows = await fetchRankingRows(req.user);
+    const rows = await fetchRankingRows(req.user, req.query);
     const csv = buildRankingCsv(rows);
     const filename = `video-ranking-${new Date().toISOString().slice(0, 10)}.csv`;
 
@@ -774,17 +931,20 @@ router.post('/', authRequired, editorOrAdmin, async (req, res) => {
     const status = cleanStatus(req.body.status);
     const publishedAt = status === 'published' ? new Date() : null;
     const source = normalizeSourcePayload(req.body);
+    const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const allowedClasses = cleanAllowedClasses(req.body.allowed_class_codes ?? req.body.allowedClassCodes);
 
     const [result] = await db.query(
       `
       INSERT INTO videos
-      (title, summary, team_name, speaker_names, source_type, video_url, video_filename, video_mime, video_size, embed_url, provider, cover_image, public_scoring_enabled, status, sort_order, created_by, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (title, summary, team_name, class_code, speaker_names, source_type, video_url, video_filename, video_mime, video_size, embed_url, provider, cover_image, public_scoring_enabled, status, sort_order, created_by, published_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         title,
         cleanString(req.body.summary, 2000),
         cleanString(req.body.team_name, 120),
+        classCode,
         cleanString(req.body.speaker_names, 255),
         source.source_type,
         source.video_url,
@@ -802,6 +962,7 @@ router.post('/', authRequired, editorOrAdmin, async (req, res) => {
       ]
     );
 
+    await saveAllowedClasses(result.insertId, allowedClasses);
     res.json(await fetchVideo(result.insertId, true));
   } catch (err) {
     console.error('[videos/create]', err);
@@ -823,6 +984,8 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
     const status = cleanStatus(req.body.status, video.status);
     const publishedAt = status === 'published' ? (video.published_at || new Date()) : null;
     const source = normalizeSourcePayload(req.body, video);
+    const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const allowedClasses = cleanAllowedClasses(req.body.allowed_class_codes ?? req.body.allowedClassCodes);
 
     if (source.source_type !== 'local' && video.video_filename) {
       removeFile(videoPathFor(video.video_filename));
@@ -831,13 +994,14 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
     await db.query(
       `
       UPDATE videos
-      SET title=?, summary=?, team_name=?, speaker_names=?, source_type=?, video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=?, provider=?, cover_image=?, public_scoring_enabled=?, status=?, sort_order=?, published_at=?
+      SET title=?, summary=?, team_name=?, class_code=?, speaker_names=?, source_type=?, video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=?, provider=?, cover_image=?, public_scoring_enabled=?, status=?, sort_order=?, published_at=?
       WHERE id=?
       `,
       [
         title,
         cleanString(req.body.summary, 2000),
         cleanString(req.body.team_name, 120),
+        classCode,
         cleanString(req.body.speaker_names, 255),
         source.source_type,
         source.video_url,
@@ -855,6 +1019,7 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
       ]
     );
 
+    await saveAllowedClasses(req.params.id, allowedClasses);
     res.json(await fetchVideo(req.params.id, true));
   } catch (err) {
     console.error('[videos/update]', err);
@@ -981,6 +1146,29 @@ router.post('/:id/public-score', async (req, res) => {
       return res.status(400).json({ message: '姓名不能为空' });
     }
 
+    const scorerClassCode = cleanClassCode(req.body.scorer_class_code || req.body.scorerClassCode);
+    if (!scorerClassCode) {
+      return res.status(400).json({ message: '请选择你的班级' });
+    }
+
+    const scorerGroupName = cleanGroupName(req.body.scorer_group_name || req.body.scorerGroupName);
+    if (!scorerGroupName) {
+      return res.status(400).json({ message: '请填写你的小组' });
+    }
+
+    if (!(await classCanScoreVideo(req.params.id, scorerClassCode))) {
+      return res.status(403).json({ message: '当前班级不允许给这个视频评分' });
+    }
+
+    if (
+      cleanClassCode(video.class_code) &&
+      cleanClassCode(video.class_code) === scorerClassCode &&
+      normalizeGroupName(video.team_name) &&
+      normalizeGroupName(video.team_name) === normalizeGroupName(scorerGroupName)
+    ) {
+      return res.status(403).json({ message: '不能给自己小组的视频打分' });
+    }
+
     const scores = {
       content: clampScore(req.body.content_score),
       delivery: clampScore(req.body.delivery_score),
@@ -993,23 +1181,25 @@ router.post('/:id/public-score', async (req, res) => {
     }
 
     const [existingRows] = await db.query(
-      'SELECT id FROM video_scores WHERE video_id=? AND scorer_name=? LIMIT 1',
-      [req.params.id, scorerName]
+      'SELECT id FROM video_scores WHERE video_id=? AND scorer_class_code=? AND scorer_name=? LIMIT 1',
+      [req.params.id, scorerClassCode, scorerName]
     );
 
     if (existingRows[0]) {
-      return res.status(409).json({ message: '这个名字已经给该视频打过分' });
+      return res.status(409).json({ message: '这个班级里的这个名字已经给该视频打过分' });
     }
 
     await db.query(
       `
       INSERT INTO video_scores
-      (video_id, user_id, scorer_name, content_score, delivery_score, technical_score, defense_score, comment)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, ?)
+      (video_id, user_id, scorer_name, scorer_class_code, scorer_group_name, content_score, delivery_score, technical_score, defense_score, comment)
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         req.params.id,
         scorerName,
+        scorerClassCode,
+        scorerGroupName,
         scores.content,
         scores.delivery,
         scores.technical,
@@ -1021,7 +1211,7 @@ router.post('/:id/public-score', async (req, res) => {
     res.json({ message: '评分已提交，感谢参与。', video: await fetchVideo(req.params.id, false) });
   } catch (err) {
     if (err?.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: '这个名字已经给该视频打过分' });
+      return res.status(409).json({ message: '这个班级里的这个名字已经给该视频打过分' });
     }
 
     console.error('[videos/public-score]', err);

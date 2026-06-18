@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, PlayCircle, Users } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { api } from '../lib/api';
+import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
 
 type VideoItem = {
   id: number;
   title: string;
   summary?: string;
   team_name?: string;
+  class_code?: string;
+  class_label?: string;
+  allowed_class_labels?: string[];
   speaker_names?: string;
   source_type?: 'local' | 'direct' | 'embed';
   source_label?: string;
@@ -37,16 +41,23 @@ function getSourceLabel(video: VideoItem) {
 }
 
 export default function VideosPage() {
+  const [searchParams] = useSearchParams();
+  const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
+  const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
+  const selectedClassLabel = getVideoClassLabel(selectedClassCode);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    api('/videos')
+    const query = selectedClassCode ? `?class_code=${encodeURIComponent(selectedClassCode)}` : '';
+
+    setLoading(true);
+    api(`/videos${query}`)
       .then((rows) => setVideos(Array.isArray(rows) ? rows : []))
       .catch((err) => setMessage(err.message || '视频加载失败'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedClassCode]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_30rem),linear-gradient(135deg,#f8fafc,#eef6ff_48%,#f8fafc)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_30rem),linear-gradient(135deg,#020617,#0f172a_55%,#020617)] dark:text-white">
@@ -65,6 +76,30 @@ export default function VideosPage() {
               集中观看班级答辩视频，按内容完整度、表达展示、技术实现、答辩表现四个维度评分，并汇总统计结果。
             </p>
           </div>
+        </section>
+
+        <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {videoClassOptions.map((item) => {
+            const active = selectedClassCode === item.code;
+
+            return (
+              <Link
+                key={item.code}
+                to={`/videos?class=${item.code}`}
+                className={`rounded-xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
+                  active
+                    ? 'border-blue-500 bg-blue-600 text-white shadow-blue-200'
+                    : 'border-slate-200/70 bg-white/85 text-slate-900 dark:border-slate-800 dark:bg-slate-900/85 dark:text-white'
+                }`}
+              >
+                <div className="text-xs font-bold uppercase tracking-[0.12em] opacity-70">Class Entry</div>
+                <div className="mt-2 text-2xl font-black">{item.label}</div>
+                <div className={`mt-3 text-sm ${active ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
+                  进入本班身份后进行视频评分
+                </div>
+              </Link>
+            );
+          })}
         </section>
 
         {message && (
@@ -89,7 +124,7 @@ export default function VideosPage() {
           {videos.map((video) => (
             <Link
               key={video.id}
-              to={`/videos/${video.id}`}
+              to={`/videos/${video.id}${selectedClassCode ? `?class=${selectedClassCode}` : ''}`}
               className="group overflow-hidden rounded-xl border border-slate-200/70 bg-white/85 shadow-sm shadow-slate-950/5 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900/85"
             >
               <div className="relative aspect-video bg-slate-900">
@@ -111,6 +146,7 @@ export default function VideosPage() {
               <div className="p-5">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
                   {video.team_name && <span>{video.team_name}</span>}
+                  {(video.class_label || video.class_code) && <span>{video.class_label || getVideoClassLabel(video.class_code)}</span>}
                   {video.speaker_names && <span>主讲：{video.speaker_names}</span>}
                   <span>{getSourceLabel(video)}</span>
                 </div>
