@@ -18,6 +18,7 @@ type VideoRow = {
   embed_url?: string | null;
   provider?: string | null;
   cover_image?: string;
+  public_scoring_enabled?: number;
   status: 'draft' | 'published';
   sort_order: number;
   score_count: number;
@@ -74,6 +75,7 @@ type FormState = {
   embed_url: string;
   provider: string;
   cover_image: string;
+  public_scoring_enabled: boolean;
   status: 'draft' | 'published';
   sort_order: number;
 };
@@ -88,6 +90,7 @@ const emptyForm: FormState = {
   embed_url: '',
   provider: '',
   cover_image: '',
+  public_scoring_enabled: false,
   status: 'draft',
   sort_order: 0,
 };
@@ -203,6 +206,7 @@ export default function AdminVideosPage() {
       embed_url: video.embed_url || '',
       provider: video.provider || '',
       cover_image: video.cover_image || '',
+      public_scoring_enabled: Boolean(video.public_scoring_enabled),
       status: video.status || 'draft',
       sort_order: Number(video.sort_order || 0),
     });
@@ -240,6 +244,8 @@ export default function AdminVideosPage() {
         provider: normalizedProvider,
         cover_image: normalizedCoverImage,
         coverImage: normalizedCoverImage,
+        public_scoring_enabled: form.public_scoring_enabled ? 1 : 0,
+        publicScoringEnabled: form.public_scoring_enabled,
         sort_order: Number(form.sort_order || 0),
       };
 
@@ -512,6 +518,20 @@ export default function AdminVideosPage() {
                 <input type="number" value={form.sort_order} onChange={(event) => update('sort_order', Number(event.target.value))} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" />
               </label>
             </div>
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={form.public_scoring_enabled}
+                onChange={(event) => update('public_scoring_enabled', event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-bold text-gray-900">允许免登录评分</span>
+                <span className="mt-1 block text-xs leading-5 text-gray-600">
+                  开启后，该视频详情页会显示姓名必填的评分表单；同一视频同一姓名只能提交一次。
+                </span>
+              </span>
+            </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">封面地址</span>
               <input value={form.cover_image} onChange={(event) => update('cover_image', event.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="/api/uploads/cover.webp" />
@@ -564,6 +584,11 @@ export default function AdminVideosPage() {
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                         {getSourceLabel(video)}
                       </span>
+                      {Number(video.public_scoring_enabled || 0) === 1 && (
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          免登录评分已开
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
                       {video.team_name || '未填写分组'} · {video.speaker_names || '未填写主讲人'} · {video.video_size_text || (video.source_type === 'embed' ? '第三方播放器' : video.source_type === 'direct' ? '外部直链' : '未上传视频')}

@@ -18,6 +18,7 @@ type VideoDetail = {
   embed_url?: string | null;
   provider?: string | null;
   cover_image?: string;
+  public_scoring_enabled?: number;
   score_count: number;
   avg_total_score?: number | null;
   avg_content_score?: number | null;
@@ -109,6 +110,7 @@ export default function VideoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [scorerName, setScorerName] = useState('');
 
   const totalScore = useMemo(
     () => form.content_score + form.delivery_score + form.technical_score + form.defense_score,
@@ -149,23 +151,35 @@ export default function VideoDetailPage() {
   };
 
   const submitScore = async () => {
-    if (!id || !user) return;
+    if (!id || !video) return;
+
+    const publicScoring = Number(video.public_scoring_enabled || 0) === 1;
+    const normalizedScorerName = scorerName.trim().replace(/\s+/g, ' ');
+
+    if (publicScoring && !normalizedScorerName) {
+      setMessage('请先填写姓名。');
+      return;
+    }
+
+    if (!publicScoring && !user) return;
 
     try {
       setSaving(true);
       setMessage('');
-      const result = await api(`/videos/${id}/score`, {
+      const result = await api(publicScoring ? `/videos/${id}/public-score` : `/videos/${id}/score`, {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify(publicScoring ? { ...form, scorer_name: normalizedScorerName } : form),
       });
       setVideo(result.video);
-      setMessage('评分已保存，可以继续修改后重新提交。');
+      setMessage(publicScoring ? '评分已提交，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
     } catch (err: any) {
       setMessage(err.message || '评分保存失败');
     } finally {
       setSaving(false);
     }
   };
+
+  const publicScoringEnabled = Number(video?.public_scoring_enabled || 0) === 1;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_30rem),linear-gradient(135deg,#f8fafc,#eef6ff_48%,#f8fafc)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_30rem),linear-gradient(135deg,#020617,#0f172a_55%,#020617)] dark:text-white">
@@ -242,7 +256,7 @@ export default function VideoDetailPage() {
                   我的评分
                 </div>
 
-                {!user ? (
+                {!publicScoringEnabled && !user ? (
                   <div className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     登录后可以评分和填写点评。
                     <Link to={`/login?redirect=/videos/${id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">
@@ -252,6 +266,22 @@ export default function VideoDetailPage() {
                   </div>
                 ) : (
                   <div className="mt-4 space-y-4">
+                    {publicScoringEnabled && (
+                      <label className="block rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">姓名（必填）</div>
+                        <input
+                          value={scorerName}
+                          onChange={(event) => setScorerName(event.target.value)}
+                          maxLength={100}
+                          className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
+                          placeholder="请填写自己的姓名"
+                        />
+                        <p className="mt-2 text-xs leading-5 text-blue-700 dark:text-blue-200">
+                          同一个视频，同一个姓名只能提交一次评分。
+                        </p>
+                      </label>
+                    )}
+
                     {dimensions.map((item) => (
                       <label key={item.key} className="block">
                         <div className="flex items-center justify-between gap-3">
