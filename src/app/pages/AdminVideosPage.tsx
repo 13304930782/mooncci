@@ -159,7 +159,7 @@ export default function AdminVideosPage() {
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [message, setMessage] = useState('');
-  const [toastProgress, setToastProgress] = useState(false);
+  const [toastProgress, setToastProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [scoreVideo, setScoreVideo] = useState<VideoRow | null>(null);
@@ -193,14 +193,28 @@ export default function AdminVideosPage() {
 
   useEffect(() => {
     if (!message) {
-      setToastProgress(false);
+      setToastProgress(0);
       return;
     }
 
-    setToastProgress(false);
-    const frame = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => setToastProgress(true));
-    });
+    const duration = 3200;
+    const startedAt = performance.now();
+    let frame = 0;
+
+    const tick = (now: number) => {
+      const next = Math.min(100, ((now - startedAt) / duration) * 100);
+      setToastProgress(next);
+
+      if (next >= 100) {
+        setMessage('');
+        return;
+      }
+
+      frame = window.requestAnimationFrame(tick);
+    };
+
+    setToastProgress(0);
+    frame = window.requestAnimationFrame(tick);
 
     return () => window.cancelAnimationFrame(frame);
   }, [message]);
@@ -372,9 +386,8 @@ export default function AdminVideosPage() {
             </div>
             <div className="h-1 bg-slate-100">
               <div
-                className="h-full rounded-r-full bg-blue-600 transition-[width] duration-[3200ms] ease-linear"
-                style={{ width: toastProgress ? '100%' : '0%' }}
-                onTransitionEnd={() => setMessage('')}
+                className="h-full rounded-r-full bg-blue-600"
+                style={{ width: `${toastProgress}%` }}
               />
             </div>
           </div>
