@@ -159,6 +159,7 @@ export default function AdminVideosPage() {
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [message, setMessage] = useState('');
+  const [toastProgress, setToastProgress] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [scoreVideo, setScoreVideo] = useState<VideoRow | null>(null);
@@ -189,6 +190,20 @@ export default function AdminVideosPage() {
     loadVideos();
     loadRankings();
   }, [manager]);
+
+  useEffect(() => {
+    if (!message) {
+      setToastProgress(false);
+      return;
+    }
+
+    setToastProgress(false);
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setToastProgress(true));
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [message]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -342,12 +357,6 @@ export default function AdminVideosPage() {
 
       {message && (
         <div className="fixed right-6 top-24 z-50 w-[22rem] max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-top-2 duration-200">
-          <style>{`
-            @keyframes admin-video-toast-progress {
-              from { transform: scaleX(0); }
-              to { transform: scaleX(1); }
-            }
-          `}</style>
           <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
             <div className="flex min-h-14 items-center gap-3 py-3 pl-4 pr-3">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.10)]" />
@@ -363,9 +372,9 @@ export default function AdminVideosPage() {
             </div>
             <div className="h-1 bg-slate-100">
               <div
-                className="h-full origin-left rounded-r-full bg-blue-600"
-                style={{ animation: 'admin-video-toast-progress 3200ms linear forwards' }}
-                onAnimationEnd={() => setMessage('')}
+                className="h-full rounded-r-full bg-blue-600 transition-[width] duration-[3200ms] ease-linear"
+                style={{ width: toastProgress ? '100%' : '0%' }}
+                onTransitionEnd={() => setMessage('')}
               />
             </div>
           </div>
