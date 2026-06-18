@@ -190,12 +190,6 @@ export default function AdminVideosPage() {
     loadRankings();
   }, [manager]);
 
-  useEffect(() => {
-    if (!message) return;
-    const timer = window.setTimeout(() => setMessage(''), 3200);
-    return () => window.clearTimeout(timer);
-  }, [message]);
-
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -371,6 +365,7 @@ export default function AdminVideosPage() {
               <div
                 className="h-full origin-left rounded-r-full bg-blue-600"
                 style={{ animation: 'admin-video-toast-progress 3200ms linear forwards' }}
+                onAnimationEnd={() => setMessage('')}
               />
             </div>
           </div>
