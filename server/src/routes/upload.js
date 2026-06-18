@@ -346,8 +346,12 @@ const upload = multer({
 });
 
 function mapMediaRow(row) {
+  const filename = safeBasename(row.filename);
+
   return {
     ...row,
+    filename,
+    url: toPublicUrl(filename),
     size_text: formatFileSize(row.size),
     uploaded_at: row.created_at,
   };
