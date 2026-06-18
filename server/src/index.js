@@ -131,6 +131,8 @@ app.use('/api/upload', uploadRoutes.router);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/home-settings', homeSettingsRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/video-scores', require('./routes/videoScores'));
+
 app.use('/api/videos', videoRoutes.router);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/admin', adminRoutes);
