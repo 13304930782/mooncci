@@ -190,6 +190,12 @@ export default function AdminVideosPage() {
     loadRankings();
   }, [manager]);
 
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
@@ -340,7 +346,24 @@ export default function AdminVideosPage() {
         </p>
       </section>
 
-      {message && <div className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>}
+      {message && (
+        <div className="fixed right-6 top-24 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-blue-700 shadow-2xl shadow-slate-950/15">
+            <div className="flex items-start gap-3">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+              <span className="min-w-0 flex-1">{message}</span>
+              <button
+                type="button"
+                onClick={() => setMessage('')}
+                className="-mr-1 rounded-lg px-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="关闭提示"
+              >
+                x
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {manager && (
         <section className="rounded-3xl bg-white/90 p-6 shadow-lg shadow-black/5">
