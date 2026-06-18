@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Download, ExternalLink, FileVideo, Link2, Plus, RefreshCw, Trash2, Trophy, Upload } from 'lucide-react';
+import { BarChart3, Download, ExternalLink, FileVideo, Link2, Plus, RefreshCw, Trash2, Trophy, Upload, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 
@@ -347,19 +347,31 @@ export default function AdminVideosPage() {
       </section>
 
       {message && (
-        <div className="fixed right-6 top-24 z-50 max-w-sm animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-blue-700 shadow-2xl shadow-slate-950/15">
-            <div className="flex items-start gap-3">
-              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
-              <span className="min-w-0 flex-1">{message}</span>
+        <div className="fixed right-6 top-24 z-50 w-[22rem] max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-top-2 duration-200">
+          <style>{`
+            @keyframes admin-video-toast-progress {
+              from { transform: scaleX(0); }
+              to { transform: scaleX(1); }
+            }
+          `}</style>
+          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
+            <div className="flex min-h-14 items-center gap-3 py-3 pl-4 pr-3">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.10)]" />
+              <span className="min-w-0 flex-1 text-sm font-bold leading-6 text-blue-700">{message}</span>
               <button
                 type="button"
                 onClick={() => setMessage('')}
-                className="-mr-1 rounded-lg px-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm shadow-slate-950/10 transition hover:border-red-100 hover:bg-red-50 hover:text-red-600"
                 aria-label="关闭提示"
               >
-                x
+                <X className="h-4 w-4" />
               </button>
+            </div>
+            <div className="h-1 bg-slate-100">
+              <div
+                className="h-full origin-left rounded-r-full bg-blue-600"
+                style={{ animation: 'admin-video-toast-progress 3200ms linear forwards' }}
+              />
             </div>
           </div>
         </div>
