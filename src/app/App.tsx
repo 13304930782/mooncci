@@ -86,6 +86,7 @@ export default function App() {
           <Route path="/article/:id" element={<ArticlePage />} />
           <Route path="/announcements" element={<AnnouncementsPage />} />
           <Route path="/videos" element={<VideosPage />} />
+          <Route path="/video/:classCode" element={<VideosPage />} />
           <Route path="/videos/:id" element={<VideoDetailPage />} />
 
           <Route path="/login" element={<LoginPage />} />

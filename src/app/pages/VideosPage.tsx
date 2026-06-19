@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BarChart3, PlayCircle, Users } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
@@ -41,8 +41,9 @@ function getSourceLabel(video: VideoItem) {
 }
 
 export default function VideosPage() {
+  const { classCode } = useParams();
   const [searchParams] = useSearchParams();
-  const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
+  const requestedClassCode = classCode || searchParams.get('class') || searchParams.get('class_code') || '';
   const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
   const selectedClassLabel = getVideoClassLabel(selectedClassCode);
   const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -92,7 +93,7 @@ export default function VideosPage() {
             return (
               <Link
                 key={item.code}
-                to={`/videos?class=${item.code}`}
+                to={`/video/${item.code}`}
                 className={`rounded-xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
                   active
                     ? 'border-blue-500 bg-blue-600 text-white shadow-blue-200'
