@@ -815,9 +815,15 @@ router.get('/', async (req, res) => {
   try {
     const classCode = cleanClassCode(req.query.class_code || req.query.class);
     const where = classCode
-      ? 'WHERE v.status="published" AND v.class_code=?'
+      ? `WHERE v.status="published" AND (
+          v.class_code=?
+          OR EXISTS (
+            SELECT 1 FROM video_allowed_classes vac
+            WHERE vac.video_id=v.id AND vac.class_code=?
+          )
+        )`
       : 'WHERE v.status="published"';
-    const params = classCode ? [classCode] : [];
+    const params = classCode ? [classCode, classCode] : [];
 
     const [rows] = await db.query(
       `
