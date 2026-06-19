@@ -86,6 +86,19 @@ export default function VideosPage() {
           </div>
         </section>
 
+        {selectedClassCode && (
+          <section className="mt-6 flex flex-col justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-900/40 dark:bg-blue-950/30 sm:flex-row sm:items-center">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-blue-600 dark:text-blue-300">Class Video Page</div>
+              <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{selectedClassLabel} 视频评审</h2>
+            </div>
+            <Link to="/videos" className="inline-flex w-fit rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+              返回班级入口
+            </Link>
+          </section>
+        )}
+
+        {!selectedClassCode && (
         <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {videoClassOptions.map((item) => {
             const active = selectedClassCode === item.code;
@@ -109,6 +122,7 @@ export default function VideosPage() {
             );
           })}
         </section>
+        )}
 
         {message && (
           <div className="mt-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
