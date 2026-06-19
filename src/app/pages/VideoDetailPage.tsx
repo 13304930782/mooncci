@@ -319,7 +319,7 @@ export default function VideoDetailPage() {
                               onChange={(event) => setScorerGroupName(event.target.value)}
                               maxLength={100}
                               className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
-                              placeholder="Example: Group 1"
+                              placeholder="小组1"
                             />
                           </label>
                         </div>
