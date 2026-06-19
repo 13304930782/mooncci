@@ -119,7 +119,7 @@ export default function VideoDetailPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [scorerName, setScorerName] = useState('');
-  const [scorerGroupName, setScorerGroupName] = useState('');
+  const [scorerGroupNumber, setScorerGroupNumber] = useState('');
   const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
   const selectedClassLabel = getVideoClassLabel(selectedClassCode);
 
@@ -166,7 +166,8 @@ export default function VideoDetailPage() {
 
     const publicScoring = Number(video.public_scoring_enabled || 0) === 1;
     const normalizedScorerName = scorerName.trim().replace(/\s+/g, ' ');
-    const normalizedScorerGroupName = scorerGroupName.trim().replace(/\s+/g, ' ');
+    const normalizedScorerGroupNumber = scorerGroupNumber.trim();
+    const normalizedScorerGroupName = normalizedScorerGroupNumber ? `小组${normalizedScorerGroupNumber}` : '';
 
     if (publicScoring && !normalizedScorerName) {
       setMessage('请先填写姓名。');
@@ -179,7 +180,7 @@ export default function VideoDetailPage() {
     }
 
     if (publicScoring && !normalizedScorerGroupName) {
-      setMessage('请先填写你的小组。');
+      setMessage('请先填写你的组号。');
       return;
     }
 
@@ -313,14 +314,20 @@ export default function VideoDetailPage() {
                             </select>
                           </label>
                           <label className="block">
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white">小组（必填）</div>
-                            <input
-                              value={scorerGroupName}
-                              onChange={(event) => setScorerGroupName(event.target.value)}
-                              maxLength={100}
-                              className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
-                              placeholder="小组1"
-                            />
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">组号（必填）</div>
+                            <div className="mt-2 flex overflow-hidden rounded-lg border border-blue-200 bg-white focus-within:border-blue-500 dark:border-blue-900 dark:bg-slate-950">
+                              <span className="flex items-center border-r border-blue-100 bg-blue-50 px-3 text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                                小组
+                              </span>
+                              <input
+                                value={scorerGroupNumber}
+                                onChange={(event) => setScorerGroupNumber(event.target.value.replace(/\D/g, '').slice(0, 2))}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+                                placeholder="1"
+                              />
+                            </div>
                           </label>
                         </div>
                         <div className="text-sm font-semibold text-slate-900 dark:text-white">姓名（必填）</div>
