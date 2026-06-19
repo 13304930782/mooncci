@@ -504,7 +504,8 @@ function buildVideoSummarySql(whereSql = '') {
       sc.avg_content_score,
       sc.avg_delivery_score,
       sc.avg_technical_score,
-      sc.avg_defense_score
+      sc.avg_defense_score,
+      ac.allowed_class_codes
     FROM videos v
     LEFT JOIN users u ON u.id = v.created_by
     LEFT JOIN (
