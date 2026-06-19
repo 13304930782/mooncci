@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { safeImageSrc } from '../lib/safeUrl';
+import { showAppToast } from '../components/AppToast';
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp,image/x-icon,image/vnd.microsoft.icon,.jpg,.jpeg,.png,.gif,.webp,.ico';
 
@@ -195,7 +196,7 @@ export default function AdminMediaPage() {
 
     try {
       const result = await uploadImage(file, imageQuality);
-      setMessage(`上传成功：${result.url}`);
+      showAppToast(`上传成功：${result.url}`);
       await load();
     } catch (err: any) {
       setMessage(err.message || '图片上传失败');
@@ -207,7 +208,7 @@ export default function AdminMediaPage() {
   const handleCopy = async (text: string, label: string) => {
     try {
       await copyText(text);
-      setMessage(`${label} 已复制`);
+      showAppToast(`${label} 已复制`);
     } catch {
       setMessage('复制失败，请手动复制');
     }
@@ -230,7 +231,7 @@ export default function AdminMediaPage() {
 
       setItems((current) => current.map((item) => (item.filename === selected.filename ? updated : item)));
       refreshSelected(updated);
-      setMessage('媒体信息已保存');
+      showAppToast('媒体信息已保存');
     } catch (err: any) {
       setMessage(err.message || '保存失败');
     } finally {
@@ -253,7 +254,7 @@ export default function AdminMediaPage() {
       setItems((current) => current.map((item) => (item.filename === selected.filename ? updated : item)));
       setSelectedFilenames((current) => current.map((filename) => (filename === selected.filename ? updated.filename : filename)));
       refreshSelected(updated);
-      setMessage('文件名已修改，文章和站点设置中的旧链接已同步替换');
+      showAppToast('文件名已修改，文章和站点设置中的旧链接已同步替换');
     } catch (err: any) {
       setMessage(err.message || '改名失败');
     } finally {
@@ -276,7 +277,7 @@ export default function AdminMediaPage() {
       setItems((current) => current.map((item) => (item.filename === selected.filename ? updated : item)));
       setSelectedFilenames((current) => current.map((filename) => (filename === selected.filename ? updated.filename : filename)));
       refreshSelected(updated);
-      setMessage(`二次压缩完成：${updated.size_text}`);
+      showAppToast(`二次压缩完成：${updated.size_text}`);
     } catch (err: any) {
       setMessage(err.message || '二次压缩失败');
     } finally {
@@ -297,7 +298,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames((current) => current.filter((filename) => filename !== selected.filename));
-      setMessage('媒体文件已移入回收站');
+      showAppToast('媒体文件已移入回收站');
       await load();
     } catch (err: any) {
       if (err.status === 409 && !force) {
@@ -327,7 +328,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames((current) => current.filter((filename) => filename !== selected.filename));
-      setMessage('媒体文件已恢复');
+      showAppToast('媒体文件已恢复');
       await load();
     } catch (err: any) {
       setMessage(err.message || '恢复失败');
@@ -350,7 +351,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames((current) => current.filter((filename) => filename !== selected.filename));
-      setMessage('媒体文件已彻底删除');
+      showAppToast('媒体文件已彻底删除');
       await load();
     } catch (err: any) {
       setMessage(err.message || '彻底删除失败');
@@ -376,7 +377,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames([]);
-      setMessage(data.message || '批量删除完成');
+      showAppToast(data.message || '批量删除完成');
       await load();
     } catch (err: any) {
       if (err.status === 409 && !force) {
@@ -407,7 +408,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames([]);
-      setMessage(data.message || '批量恢复完成');
+      showAppToast(data.message || '批量恢复完成');
       await load();
     } catch (err: any) {
       setMessage(err.message || '批量恢复失败');
@@ -431,7 +432,7 @@ export default function AdminMediaPage() {
 
       setSelected(null);
       setSelectedFilenames([]);
-      setMessage(data.message || '批量彻底删除完成');
+      showAppToast(data.message || '批量彻底删除完成');
       await load();
     } catch (err: any) {
       setMessage(err.message || '批量彻底删除失败');

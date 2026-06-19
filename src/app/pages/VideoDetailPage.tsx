@@ -6,6 +6,7 @@ import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
+import { showAppToast } from '../components/AppToast';
 
 type VideoDetail = {
   id: number;
@@ -197,7 +198,7 @@ export default function VideoDetailPage() {
         } : form),
       });
       setVideo(result.video);
-      setMessage(publicScoring ? '评分已提交，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
+      showAppToast(publicScoring ? '评分已提交，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
     } catch (err: any) {
       setMessage(err.message || '璇勫垎淇濆瓨澶辫触');
     } finally {

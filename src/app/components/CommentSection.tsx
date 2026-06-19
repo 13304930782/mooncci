@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Heart, MessageCircle, Reply, Send, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { showAppToast } from './AppToast';
 
 type Comment = {
   id: number;
@@ -129,7 +130,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
         body: JSON.stringify({ content }),
       });
 
-      setMessage(res.message || '评论已提交');
+      showAppToast(res.message || '评论已提交');
       setContent('');
       loadComments();
     } catch (err: any) {
@@ -162,7 +163,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
         }),
       });
 
-      setMessage(res.message || '回复已提交');
+      showAppToast(res.message || '回复已提交');
       setReplyContent('');
       setReplyingTo(null);
       loadComments();
@@ -205,7 +206,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
 
     try {
       const res = await api('/comments/' + comment.id, { method: 'DELETE' });
-      setMessage(res.message || '评论已删除');
+      showAppToast(res.message || '评论已删除');
       loadComments();
     } catch (err: any) {
       setMessage(err.message || '删除失败');

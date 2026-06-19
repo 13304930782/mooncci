@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -25,7 +26,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
 
-      setMessage(res.message || '如果该邮箱存在，我们会发送密码重置邮件');
+      showAppToast(res.message || '如果该邮箱存在，我们会发送密码重置邮件');
     } catch (err: any) {
       setMessage(err.message || '发送失败，请稍后重试');
     } finally {

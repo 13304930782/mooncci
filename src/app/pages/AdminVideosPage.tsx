@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Download, ExternalLink, FileVideo, Link2, Plus, RefreshCw, Trash2, Trophy, Upload, X } from 'lucide-react';
+import { BarChart3, Download, ExternalLink, FileVideo, Link2, Plus, RefreshCw, Trash2, Trophy, Upload } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { getVideoClassLabel, videoClassOptions } from '../lib/videoClasses';
+import { showAppToast } from '../components/AppToast';
 
 type SourceType = 'local' | 'direct' | 'embed';
 
@@ -172,7 +173,6 @@ export default function AdminVideosPage() {
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [message, setMessage] = useState('');
-  const [toastProgress, setToastProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [scoreVideo, setScoreVideo] = useState<VideoRow | null>(null);
@@ -215,34 +215,6 @@ export default function AdminVideosPage() {
     loadVideos();
     loadRankings();
   }, [manager, rankingVideoClass, rankingScorerClass]);
-
-  useEffect(() => {
-    if (!message) {
-      setToastProgress(0);
-      return;
-    }
-
-    const duration = 3200;
-    const startedAt = performance.now();
-    let frame = 0;
-
-    const tick = (now: number) => {
-      const next = Math.min(100, ((now - startedAt) / duration) * 100);
-      setToastProgress(next);
-
-      if (next >= 100) {
-        setMessage('');
-        return;
-      }
-
-      frame = window.requestAnimationFrame(tick);
-    };
-
-    setToastProgress(0);
-    frame = window.requestAnimationFrame(tick);
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [message]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -326,14 +298,14 @@ export default function AdminVideosPage() {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
-        setMessage('视频信息已保存');
+        showAppToast('视频信息已保存');
       } else {
         const created = await api('/videos', {
           method: 'POST',
           body: JSON.stringify(payload),
         });
         setForm((current) => ({ ...current, id: created.id }));
-        setMessage(form.source_type === 'local' ? '视频条目已创建，可以上传本地视频文件' : '视频条目已创建');
+        showAppToast(form.source_type === 'local' ? '视频条目已创建，可以上传本地视频文件' : '视频条目已创建');
       }
 
       loadVideos();
@@ -352,7 +324,7 @@ export default function AdminVideosPage() {
       setUploadingId(videoId);
       setMessage('');
       await uploadVideo(videoId, file);
-      setMessage('本地视频文件已上传，视频来源已切换为“本地上传”');
+      showAppToast('本地视频文件已上传，视频来源已切换为“本地上传”');
       loadVideos();
       loadRankings();
     } catch (err: any) {
@@ -369,7 +341,7 @@ export default function AdminVideosPage() {
       setMessage('');
       const url = await uploadCover(file);
       setForm((current) => ({ ...current, cover_image: url }));
-      setMessage('封面已上传，记得保存视频信息');
+      showAppToast('封面已上传，记得保存视频信息');
     } catch (err: any) {
       setMessage(err.message || '封面上传失败');
     }
@@ -380,7 +352,7 @@ export default function AdminVideosPage() {
 
     try {
       await api(`/videos/${video.id}`, { method: 'DELETE' });
-      setMessage('视频已删除');
+      showAppToast('视频已删除');
       if (form.id === video.id) resetForm();
       loadVideos();
       loadRankings();
@@ -413,27 +385,8 @@ export default function AdminVideosPage() {
       </section>
 
       {message && (
-        <div className="fixed right-6 top-24 z-50 w-[22rem] max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/20">
-            <div className="flex min-h-14 items-center gap-3 py-3 pl-4 pr-3">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.10)]" />
-              <span className="min-w-0 flex-1 text-sm font-bold leading-6 text-blue-700">{message}</span>
-              <button
-                type="button"
-                onClick={() => setMessage('')}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm shadow-slate-950/10 transition hover:border-red-100 hover:bg-red-50 hover:text-red-600"
-                aria-label="关闭提示"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="h-1 bg-slate-100">
-              <div
-                className="h-full rounded-r-full bg-blue-600"
-                style={{ width: `${toastProgress}%` }}
-              />
-            </div>
-          </div>
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700">
+          {message}
         </div>
       )}
 

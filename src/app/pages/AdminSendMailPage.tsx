@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Mail, Send } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminSendMailPage() {
   const [to, setTo] = useState('');
@@ -36,7 +37,7 @@ export default function AdminSendMailPage() {
         body: JSON.stringify({ to, subject, content }),
       });
 
-      setMessage(res.message || '邮件已发送');
+      showAppToast(res.message || '邮件已发送');
       setSubject('');
       setContent('');
     } catch (err: any) {

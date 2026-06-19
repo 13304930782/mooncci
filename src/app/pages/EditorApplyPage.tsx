@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PenLine, Send, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { showAppToast } from '../components/AppToast';
 
 const roleLabel: Record<string, string> = {
   owner: '站长',
@@ -66,7 +67,7 @@ export default function EditorApplyPage() {
         body: JSON.stringify({ reason }),
       });
 
-      setMessage(res.message || '申请已提交，请等待管理员审核');
+      showAppToast(res.message || '申请已提交，请等待管理员审核');
       setReason('');
     } catch (err: any) {
       setMessage(err.message || '申请提交失败');

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -44,7 +45,7 @@ export default function ResetPasswordPage() {
         body: JSON.stringify({ token, password }),
       });
 
-      setMessage(res.message || '密码已重置，请重新登录');
+      showAppToast(res.message || '密码已重置，请重新登录');
     } catch (err: any) {
       setMessage(err.message || '重置失败');
     } finally {

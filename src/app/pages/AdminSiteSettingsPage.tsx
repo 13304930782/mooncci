@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { api } from '../lib/api';
 import { safeImageSrc } from '../lib/safeUrl';
+import { showAppToast } from '../components/AppToast';
 
 const defaultBrand = {
   site_title: '',
@@ -96,7 +97,7 @@ export default function AdminSiteSettingsPage() {
         body: JSON.stringify({ brand, profile, footer }),
       });
 
-      setMessage('保存成功');
+      showAppToast('保存成功');
     } catch (err: any) {
       setMessage(err.message || '保存失败');
     } finally {
@@ -113,7 +114,7 @@ export default function AdminSiteSettingsPage() {
     try {
       const url = await uploadImage(file);
       updateProfile('avatar_url', url);
-      setMessage('头像上传成功，记得点击保存');
+      showAppToast('头像上传成功，记得点击保存');
     } catch (err: any) {
       setMessage(err.message || '头像上传失败');
     } finally {
@@ -130,7 +131,7 @@ export default function AdminSiteSettingsPage() {
     try {
       const url = await uploadImage(file);
       updateBrand(key, url);
-      setMessage(key === 'logo_url' ? 'Logo 上传成功，记得点击保存' : 'favicon 上传成功，记得点击保存');
+      showAppToast(key === 'logo_url' ? 'Logo 上传成功，记得点击保存' : 'favicon 上传成功，记得点击保存');
     } catch (err: any) {
       setMessage(err.message || '图片上传失败');
     } finally {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminEditorApplicationsPage() {
   const [applications, setApplications] = useState<any[]>([]);
@@ -26,7 +27,7 @@ export default function AdminEditorApplicationsPage() {
         body: JSON.stringify({ status: nextStatus, review_note: note }),
       });
 
-      setMessage(res.message || '操作成功');
+      showAppToast(res.message || '操作成功');
       loadApplications();
     } catch (err: any) {
       setMessage(err.message || '操作失败');

@@ -3,6 +3,7 @@ import { ArrowRight, Lock, Mail, Sparkles, User } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { showAppToast } from '../components/AppToast';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -38,7 +39,7 @@ export default function RegisterPage() {
 
     try {
       await register(username, email, password);
-      setMessage('注册成功，即将跳转登录页');
+      showAppToast('注册成功，即将跳转登录页');
       setTimeout(() => navigate('/login'), 700);
     } catch (err: any) {
       setMessage(err.message || '注册失败');

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminBannedWordsPage() {
   const [words, setWords] = useState<any[]>([]);
@@ -34,7 +35,7 @@ export default function AdminBannedWordsPage() {
       });
 
       setWord('');
-      setMessage('添加成功');
+      showAppToast('添加成功');
       loadWords();
     } catch (err: any) {
       setMessage(err.message || '添加失败');
@@ -46,7 +47,7 @@ export default function AdminBannedWordsPage() {
 
     try {
       await api(`/admin/banned-words/${id}`, { method: 'DELETE' });
-      setMessage('删除成功');
+      showAppToast('删除成功');
       loadWords();
     } catch (err: any) {
       setMessage(err.message || '删除失败');

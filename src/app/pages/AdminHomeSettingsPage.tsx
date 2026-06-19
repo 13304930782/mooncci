@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { notifyHomeSettingsUpdated } from '../lib/homeSettingsEvents';
+import { showAppToast } from '../components/AppToast';
 import {
   defaultHomeSettings,
   normalizeHomeSettings,
@@ -195,7 +196,7 @@ export default function AdminHomeSettingsPage() {
     setSettings(next);
     setChipsText(next.hero_chips.join('\n'));
     notifyHomeSettingsUpdated(next);
-    setMessage(`${successMessage} 已通知公开首页自动刷新。`);
+    showAppToast(`${successMessage} 已通知公开首页自动刷新。`);
   };
 
   const save = async () => {

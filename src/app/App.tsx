@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SiteMeta } from './components/SiteMeta';
 import { MooncciLoadingScreen } from './components/MooncciLoadingScreen';
+import { AppToastHost } from './components/AppToast';
 import { useInertialScroll } from './lib/useInertialScroll';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -79,6 +80,7 @@ export default function App() {
     <AuthProvider>
       <SiteMeta />
       <BrowserRouter>
+        <AppToastHost />
         <Suspense fallback={<MooncciLoadingScreen />}>
           <Routes>
             <Route path="/" element={<HomePage />} />

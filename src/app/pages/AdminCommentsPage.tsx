@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 const statusText: Record<string, string> = {
   pending: '待审核',
@@ -54,7 +55,7 @@ export default function AdminCommentsPage() {
         body: JSON.stringify({ status: nextStatus }),
       });
 
-      setMessage(res.message || '操作成功');
+      showAppToast(res.message || '操作成功');
       loadComments();
     } catch (err: any) {
       setMessage(err.message || '操作失败');

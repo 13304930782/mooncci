@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MarkdownContent } from '../components/MarkdownContent';
 import { safeImageSrc } from '../lib/safeUrl';
+import { showAppToast } from '../components/AppToast';
 
 const emptyForm = {
   title: '',
@@ -117,6 +118,7 @@ export default function AdminWritePage() {
         await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
       }
 
+      showAppToast(isEdit ? '文章已保存' : '文章已发布');
       navigate('/admin/posts');
     } catch (err: any) {
       setMessage(err.message || '保存失败');
@@ -134,7 +136,7 @@ export default function AdminWritePage() {
     try {
       const url = await uploadImage(file, imageQuality);
       update('cover_image', url);
-      setMessage('封面上传成功');
+      showAppToast('封面上传成功');
     } catch (err: any) {
       setMessage(err.message || '封面上传失败');
     } finally {
@@ -151,7 +153,7 @@ export default function AdminWritePage() {
     try {
       const url = await uploadImage(file, imageQuality);
       update('content', `${form.content}\n\n![图片](${url})\n\n`);
-      setMessage('图片已插入正文');
+      showAppToast('图片已插入正文');
     } catch (err: any) {
       setMessage(err.message || '图片上传失败');
     } finally {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminPostsPage() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export default function AdminPostsPage() {
 
     try {
       await api(`/posts/${id}`, { method: 'DELETE' });
-      setMessage('删除成功');
+      showAppToast('删除成功');
       loadPosts();
     } catch (err: any) {
       setMessage(err.message || '删除失败');
