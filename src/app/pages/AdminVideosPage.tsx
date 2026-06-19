@@ -430,7 +430,7 @@ export default function AdminVideosPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
               >
                 <RefreshCw className="h-4 w-4" />
-                {rankingLoading ? '刷新中' : '刷新排名'}
+                {rankingLoading ? '刷新中...' : '刷新排名'}
               </button>
               <a
                 href={rankingExportUrl}
@@ -715,7 +715,7 @@ export default function AdminVideosPage() {
                     </button>
                     <label className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50">
                       <Upload className="h-4 w-4" />
-                      {uploadingId === video.id ? '上传中' : video.source_type === 'local' ? '上传视频' : '上传并切为本地'}
+                      {uploadingId === video.id ? '上传中...' : video.source_type === 'local' ? '上传视频' : '上传并切为本地'}
                       <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(event) => handleVideoFile(video.id, event.target.files?.[0])} />
                     </label>
                     {video.source_type === 'direct' && video.video_url && (
