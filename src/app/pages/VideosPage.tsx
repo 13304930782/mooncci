@@ -40,6 +40,23 @@ function getSourceLabel(video: VideoItem) {
   return '本地上传';
 }
 
+function getGroupNumber(teamName?: string) {
+  return String(teamName || '').match(/\d+/)?.[0] || '';
+}
+
+function getDisplayTeamName(teamName?: string) {
+  const groupNumber = getGroupNumber(teamName);
+  if (groupNumber) return `第${groupNumber}组`;
+  return teamName || '';
+}
+
+function getVideoDisplayTitle(video: VideoItem) {
+  const groupNumber = getGroupNumber(video.team_name);
+  if (groupNumber) return `第${groupNumber}组答辩视频`;
+  if (video.team_name) return `${video.team_name}答辩视频`;
+  return video.title;
+}
+
 export default function VideosPage() {
   const { classCode } = useParams();
   const [searchParams] = useSearchParams();
@@ -158,7 +175,7 @@ export default function VideosPage() {
             >
               <div className="relative aspect-video bg-slate-900">
                 {video.cover_image ? (
-                  <img src={video.cover_image} alt={video.title} className="h-full w-full object-cover" />
+                  <img src={video.cover_image} alt={getVideoDisplayTitle(video)} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-950 via-slate-900 to-purple-950 text-white">
                     <PlayCircle className="h-14 w-14 opacity-80" />
@@ -174,13 +191,13 @@ export default function VideosPage() {
 
               <div className="p-5">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  {video.team_name && <span>{video.team_name}</span>}
+                  {getDisplayTeamName(video.team_name) && <span>{getDisplayTeamName(video.team_name)}</span>}
                   {(video.class_label || video.class_code) && <span>{video.class_label || getVideoClassLabel(video.class_code)}</span>}
                   {video.speaker_names && <span>主讲：{video.speaker_names}</span>}
                   <span>{getSourceLabel(video)}</span>
                 </div>
                 <h2 className="mt-3 text-lg font-black tracking-tight text-slate-950 dark:text-white">
-                  {video.title}
+                  {getVideoDisplayTitle(video)}
                 </h2>
                 <p className="mt-3 line-clamp-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
                   {video.summary || '暂无简介'}

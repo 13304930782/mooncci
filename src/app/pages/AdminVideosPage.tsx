@@ -131,6 +131,28 @@ function getSourceLabel(video: Pick<VideoRow, 'source_type' | 'source_label' | '
   return '本地上传';
 }
 
+function getGroupNumber(teamName?: string) {
+  return String(teamName || '').match(/\d+/)?.[0] || '';
+}
+
+function formatTeamNameFromNumber(groupNumber: string) {
+  const digits = groupNumber.trim().replace(/\D/g, '').slice(0, 2);
+  return digits ? `第${digits}组` : '';
+}
+
+function getDisplayTeamName(teamName?: string) {
+  const groupNumber = getGroupNumber(teamName);
+  if (groupNumber) return `第${groupNumber}组`;
+  return teamName || '';
+}
+
+function getVideoDisplayTitle(video: { team_name?: string; title: string }) {
+  const groupNumber = getGroupNumber(video.team_name);
+  if (groupNumber) return `第${groupNumber}组答辩视频`;
+  if (video.team_name) return `${video.team_name}答辩视频`;
+  return video.title;
+}
+
 async function uploadVideo(videoId: number, file: File) {
   const formData = new FormData();
   formData.append('video', file);
@@ -237,7 +259,7 @@ export default function AdminVideosPage() {
       id: video.id,
       title: video.title || '',
       summary: video.summary || '',
-      team_name: video.team_name || '',
+      team_name: getGroupNumber(video.team_name) || '',
       class_code: video.class_code || '',
       allowed_class_codes: Array.isArray(video.allowed_class_codes) ? video.allowed_class_codes : [],
       speaker_names: video.speaker_names || '',
@@ -265,12 +287,13 @@ export default function AdminVideosPage() {
       const normalizedEmbedUrl = form.embed_url.trim();
       const normalizedProvider = form.provider.trim();
       const normalizedCoverImage = form.cover_image.trim();
+      const normalizedTeamName = formatTeamNameFromNumber(form.team_name);
 
       const payload = {
         ...form,
-        title: form.title.trim(),
+        title: form.title.trim() || (normalizedTeamName ? `${normalizedTeamName}答辩视频` : ''),
         summary: form.summary.trim(),
-        team_name: form.team_name.trim(),
+        team_name: normalizedTeamName,
         class_code: form.class_code,
         classCode: form.class_code,
         allowed_class_codes: form.allowed_class_codes,
@@ -348,7 +371,7 @@ export default function AdminVideosPage() {
   };
 
   const removeVideo = async (video: VideoRow) => {
-    if (!window.confirm(`确定删除「${video.title}」吗？本地视频文件和评分都会删除，外部平台原视频不会删除。`)) return;
+    if (!window.confirm(`确定删除「${getVideoDisplayTitle(video)}」吗？本地视频文件和评分都会删除，外部平台原视频不会删除。`)) return;
 
     try {
       await api(`/videos/${video.id}`, { method: 'DELETE' });
@@ -463,8 +486,8 @@ export default function AdminVideosPage() {
                   <tr key={row.id} className="border-b last:border-0">
                     <td className="py-3 pr-4 font-black text-amber-600">{row.rank ? `#${row.rank}` : '-'}</td>
                     <td className="min-w-64 py-3 pr-4">
-                      <div className="font-bold text-gray-900">{row.title}</div>
-                      <div className="mt-1 text-xs text-gray-500">{row.team_name || '未填写分组'} · {row.speaker_names || '未填写主讲人'}</div>
+                      <div className="font-bold text-gray-900">{getVideoDisplayTitle(row)}</div>
+                      <div className="mt-1 text-xs text-gray-500">{getDisplayTeamName(row.team_name) || '未填写组号'} · {row.speaker_names || '未填写主讲人'}</div>
                     </td>
                     <td className="py-3 pr-4">{row.score_count}</td>
                     <td className="py-3 pr-4 font-black text-blue-700">{formatFinalScore(row.final_score)}</td>
@@ -505,8 +528,20 @@ export default function AdminVideosPage() {
               <input value={form.title} onChange={(event) => update('title', event.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" />
             </label>
             <label className="block">
-              <span className="text-sm font-semibold text-gray-700">分组/小组</span>
-              <input value={form.team_name} onChange={(event) => update('team_name', event.target.value)} className="mt-2 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500" placeholder="例如：第六组" />
+              <span className="text-sm font-semibold text-gray-700">组号</span>
+              <div className="mt-2 flex overflow-hidden rounded-2xl border border-gray-200 bg-white text-sm focus-within:border-blue-500">
+                <span className="grid w-12 place-items-center border-r border-gray-100 bg-gray-50 font-semibold text-gray-500">第</span>
+                <input
+                  value={form.team_name}
+                  onChange={(event) => update('team_name', event.target.value.replace(/\D/g, '').slice(0, 2))}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="min-w-0 flex-1 px-4 py-3 outline-none"
+                  placeholder="1"
+                />
+                <span className="grid w-12 place-items-center border-l border-gray-100 bg-gray-50 font-semibold text-gray-500">组</span>
+              </div>
+              <span className="mt-1 block text-xs text-gray-500">例如填 1，前台会显示为“第1组答辩视频”。</span>
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">所属班级</span>
@@ -674,7 +709,7 @@ export default function AdminVideosPage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-bold text-gray-900">{video.title}</h3>
+                      <h3 className="text-lg font-bold text-gray-900">{getVideoDisplayTitle(video)}</h3>
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${video.status === 'published' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
                         {video.status === 'published' ? '已发布' : '草稿'}
                       </span>
@@ -693,7 +728,7 @@ export default function AdminVideosPage() {
                       )}
                     </div>
                     <p className="mt-1 text-sm text-gray-500">
-                      {video.team_name || '未填写分组'} · {video.speaker_names || '未填写主讲人'} · {video.video_size_text || (video.source_type === 'embed' ? '第三方播放器' : video.source_type === 'direct' ? '外部直链' : '未上传视频')}
+                      {getDisplayTeamName(video.team_name) || '未填写组号'} · {video.speaker_names || '未填写主讲人'} · {video.video_size_text || (video.source_type === 'embed' ? '第三方播放器' : video.source_type === 'direct' ? '外部直链' : '未上传视频')}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
                       允许评分：{video.allowed_class_labels?.length ? video.allowed_class_labels.join('、') : '全部班级'}
@@ -752,7 +787,7 @@ export default function AdminVideosPage() {
         <section className="rounded-3xl bg-white/90 p-6 shadow-lg shadow-black/5">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">评分明细：{scoreVideo.title}</h2>
+              <h2 className="text-xl font-bold text-gray-900">评分明细：{getVideoDisplayTitle(scoreVideo)}</h2>
               <p className="mt-1 text-sm text-gray-500">共 {scores.length} 条评分，可用于课堂汇总。</p>
             </div>
             <button type="button" onClick={() => setScoreVideo(null)} className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">

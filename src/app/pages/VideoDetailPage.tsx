@@ -74,12 +74,29 @@ function getSourceLabel(video: VideoDetail) {
   return '本地上传';
 }
 
+function getGroupNumber(teamName?: string) {
+  return String(teamName || '').match(/\d+/)?.[0] || '';
+}
+
+function getDisplayTeamName(teamName?: string) {
+  const groupNumber = getGroupNumber(teamName);
+  if (groupNumber) return `第${groupNumber}组`;
+  return teamName || '';
+}
+
+function getVideoDisplayTitle(video: VideoDetail) {
+  const groupNumber = getGroupNumber(video.team_name);
+  if (groupNumber) return `第${groupNumber}组答辩视频`;
+  if (video.team_name) return `${video.team_name}答辩视频`;
+  return video.title;
+}
+
 function VideoPlayer({ video }: { video: VideoDetail }) {
   if (video.source_type === 'embed' && video.embed_url) {
     return (
       <iframe
         src={video.embed_url}
-        title={video.title}
+        title={getVideoDisplayTitle(video)}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
@@ -239,12 +256,12 @@ export default function VideoDetailPage() {
 
               <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/85 p-6 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/85">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  {video.team_name && <span>{video.team_name}</span>}
+                  {getDisplayTeamName(video.team_name) && <span>{getDisplayTeamName(video.team_name)}</span>}
                   {video.speaker_names && <span>主讲：{video.speaker_names}</span>}
                   <span>{getSourceLabel(video)}</span>
                 </div>
                 <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white">
-                  {video.title}
+                  {getVideoDisplayTitle(video)}
                 </h1>
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-8 text-slate-600 dark:text-slate-300">
                   {video.summary || '暂无简介'}
