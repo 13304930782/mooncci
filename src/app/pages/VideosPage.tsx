@@ -50,6 +50,13 @@ export default function VideosPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (!selectedClassCode) {
+      setVideos([]);
+      setLoading(false);
+      setMessage('');
+      return;
+    }
+
     const query = selectedClassCode ? `?class_code=${encodeURIComponent(selectedClassCode)}` : '';
 
     setLoading(true);
@@ -108,18 +115,25 @@ export default function VideosPage() {
           </div>
         )}
 
-        {loading && (
+        {!selectedClassCode && (
+          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+            请先选择上方班级入口，进入后只显示该班级的视频。
+          </div>
+        )}
+
+        {selectedClassCode && loading && (
           <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/75 p-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/75">
             正在加载视频...
           </div>
         )}
 
-        {!loading && videos.length === 0 && (
+        {selectedClassCode && !loading && videos.length === 0 && (
           <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/75 p-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/75">
             还没有发布答辩视频。
           </div>
         )}
 
+        {selectedClassCode && (
         <section className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {videos.map((video) => (
             <Link
@@ -177,6 +191,7 @@ export default function VideosPage() {
             </Link>
           ))}
         </section>
+        )}
       </main>
 
       <SiteFooter />
