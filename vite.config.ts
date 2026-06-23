@@ -33,4 +33,35 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          const normalizedId = id.replace(/\\/g, '/')
+
+          if (!normalizedId.includes('/node_modules/')) {
+            return undefined
+          }
+
+          if (normalizedId.includes('/node_modules/lucide-react/')) {
+            return 'vendor-icons'
+          }
+
+          if (
+            normalizedId.includes('/node_modules/react-markdown/') ||
+            normalizedId.includes('/node_modules/remark-') ||
+            normalizedId.includes('/node_modules/rehype-') ||
+            normalizedId.includes('/node_modules/unified/') ||
+            normalizedId.includes('/node_modules/mdast-') ||
+            normalizedId.includes('/node_modules/hast-') ||
+            normalizedId.includes('/node_modules/micromark')
+          ) {
+            return 'vendor-markdown'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
+  },
 })

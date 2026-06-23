@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 const defaultMail = {
   enabled: 'false',
@@ -23,7 +24,7 @@ export default function AdminMailSettingsPage() {
   useEffect(() => {
     api('/settings/mail')
       .then((data) => setMail({ ...defaultMail, ...data }))
-      .catch((err) => setMessage(err.message || '邮件设置加载失败'));
+      .catch((err) => showAppToast(err.message || '邮件设置加载失败'));
   }, []);
 
   const update = (key: string, value: string) => {
@@ -40,13 +41,13 @@ export default function AdminMailSettingsPage() {
         body: JSON.stringify(mail),
       });
 
-      setMessage(res.message || '保存成功');
+      showAppToast(res.message || '保存成功');
 
       if (res.mail) {
         setMail({ ...defaultMail, ...res.mail });
       }
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -62,9 +63,9 @@ export default function AdminMailSettingsPage() {
         body: JSON.stringify({}),
       });
 
-      setMessage(res.message || '测试邮件已发送');
+      showAppToast(res.message || '测试邮件已发送');
     } catch (err: any) {
-      setMessage(err.message || '测试邮件发送失败');
+      showAppToast(err.message || '测试邮件发送失败');
     } finally {
       setTesting(false);
     }

@@ -56,6 +56,28 @@ const defaultMail = {
   site_url: process.env.SITE_URL || 'https://mooncci.site',
 };
 
+let schemaReadyPromise = null;
+
+function ensureSettingsSchema() {
+  if (!schemaReadyPromise) {
+    schemaReadyPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS site_settings (
+          setting_key varchar(100) NOT NULL,
+          setting_value longtext NOT NULL,
+          updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (setting_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+      `);
+    })().catch((err) => {
+      schemaReadyPromise = null;
+      throw err;
+    });
+  }
+
+  return schemaReadyPromise;
+}
+
 function safeParse(value, fallback) {
   try {
     return JSON.parse(value || '');
@@ -136,6 +158,8 @@ function pickStringFields(source, fallback) {
 }
 
 async function getSetting(key, fallback) {
+  await ensureSettingsSchema();
+
   const [rows] = await db.query(
     'SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1',
     [key]
@@ -150,14 +174,33 @@ async function getSetting(key, fallback) {
 }
 
 async function saveSetting(key, value) {
-  await db.query(
-    `
-    INSERT INTO site_settings (setting_key, setting_value)
-    VALUES (?, ?)
-    ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
-    `,
-    [key, JSON.stringify(value)]
+  await ensureSettingsSchema();
+
+  const settingValue = JSON.stringify(value);
+  const [result] = await db.query(
+    'UPDATE site_settings SET setting_value=? WHERE setting_key=?',
+    [settingValue, key]
   );
+
+  if (result.affectedRows > 0) {
+    return;
+  }
+
+  try {
+    await db.query(
+      'INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?)',
+      [key, settingValue]
+    );
+  } catch (err) {
+    if (err.code !== 'ER_DUP_ENTRY') {
+      throw err;
+    }
+
+    await db.query(
+      'UPDATE site_settings SET setting_value=? WHERE setting_key=?',
+      [settingValue, key]
+    );
+  }
 }
 
 function publicMailConfig(config) {

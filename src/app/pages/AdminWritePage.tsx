@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { MarkdownContent } from '../components/MarkdownContent';
 import { safeImageSrc } from '../lib/safeUrl';
+import { showAppToast } from '../components/AppToast';
 
 const emptyForm = {
   title: '',
@@ -86,7 +87,7 @@ export default function AdminWritePage() {
           status: post.status || 'published',
         });
       })
-      .catch((err) => setMessage(err.message || '文章加载失败'));
+      .catch((err) => showAppToast(err.message || '文章加载失败'));
   }, [id]);
 
   const payload = useMemo(() => ({
@@ -103,7 +104,7 @@ export default function AdminWritePage() {
     event.preventDefault();
 
     if (!form.title || !form.content) {
-      setMessage('标题和正文不能为空');
+      showAppToast('标题和正文不能为空');
       return;
     }
 
@@ -117,9 +118,10 @@ export default function AdminWritePage() {
         await api('/posts', { method: 'POST', body: JSON.stringify(payload) });
       }
 
+      showAppToast(isEdit ? '文章已保存' : '文章已发布');
       navigate('/admin/posts');
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -134,9 +136,9 @@ export default function AdminWritePage() {
     try {
       const url = await uploadImage(file, imageQuality);
       update('cover_image', url);
-      setMessage('封面上传成功');
+      showAppToast('封面上传成功');
     } catch (err: any) {
-      setMessage(err.message || '封面上传失败');
+      showAppToast(err.message || '封面上传失败');
     } finally {
       setUploading(false);
     }
@@ -151,9 +153,9 @@ export default function AdminWritePage() {
     try {
       const url = await uploadImage(file, imageQuality);
       update('content', `${form.content}\n\n![图片](${url})\n\n`);
-      setMessage('图片已插入正文');
+      showAppToast('图片已插入正文');
     } catch (err: any) {
-      setMessage(err.message || '图片上传失败');
+      showAppToast(err.message || '图片上传失败');
     } finally {
       setUploading(false);
     }

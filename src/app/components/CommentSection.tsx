@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Heart, MessageCircle, Reply, Send, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { showAppToast } from './AppToast';
 
 type Comment = {
   id: number;
@@ -90,7 +91,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
   const loadComments = () => {
     api('/comments/post/' + postId + '?sort=' + sort)
       .then(setComments)
-      .catch((err) => setMessage(err.message || '评论加载失败'));
+      .catch((err) => showAppToast(err.message || '评论加载失败'));
   };
 
   useEffect(() => {
@@ -111,12 +112,12 @@ export function CommentSection({ postId }: { postId: number | string }) {
     event.preventDefault();
 
     if (!user) {
-      setMessage('请先登录后再评论');
+      showAppToast('请先登录后再评论');
       return;
     }
 
     if (!content.trim()) {
-      setMessage('评论内容不能为空');
+      showAppToast('评论内容不能为空');
       return;
     }
 
@@ -129,11 +130,11 @@ export function CommentSection({ postId }: { postId: number | string }) {
         body: JSON.stringify({ content }),
       });
 
-      setMessage(res.message || '评论已提交');
+      showAppToast(res.message || '评论已提交');
       setContent('');
       loadComments();
     } catch (err: any) {
-      setMessage(err.message || '评论提交失败');
+      showAppToast(err.message || '评论提交失败');
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
     if (!user || !replyingTo) return;
 
     if (!replyContent.trim()) {
-      setMessage('回复内容不能为空');
+      showAppToast('回复内容不能为空');
       return;
     }
 
@@ -162,12 +163,12 @@ export function CommentSection({ postId }: { postId: number | string }) {
         }),
       });
 
-      setMessage(res.message || '回复已提交');
+      showAppToast(res.message || '回复已提交');
       setReplyContent('');
       setReplyingTo(null);
       loadComments();
     } catch (err: any) {
-      setMessage(err.message || '回复提交失败');
+      showAppToast(err.message || '回复提交失败');
     } finally {
       setSubmittingReply(false);
     }
@@ -175,12 +176,12 @@ export function CommentSection({ postId }: { postId: number | string }) {
 
   const toggleLike = async (comment: Comment) => {
     if (!user) {
-      setMessage('请先登录后再点赞');
+      showAppToast('请先登录后再点赞');
       return;
     }
 
     if (comment.status !== 'visible') {
-      setMessage('审核中的评论暂不能点赞');
+      showAppToast('审核中的评论暂不能点赞');
       return;
     }
 
@@ -196,7 +197,7 @@ export function CommentSection({ postId }: { postId: number | string }) {
 
       loadComments();
     } catch (err: any) {
-      setMessage(err.message || '操作失败');
+      showAppToast(err.message || '操作失败');
     }
   };
 
@@ -205,10 +206,10 @@ export function CommentSection({ postId }: { postId: number | string }) {
 
     try {
       const res = await api('/comments/' + comment.id, { method: 'DELETE' });
-      setMessage(res.message || '评论已删除');
+      showAppToast(res.message || '评论已删除');
       loadComments();
     } catch (err: any) {
-      setMessage(err.message || '删除失败');
+      showAppToast(err.message || '删除失败');
     }
   };
 

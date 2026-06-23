@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Edit3, Megaphone, Plus, Save, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 type Announcement = {
   id: number;
@@ -55,7 +56,7 @@ export default function AdminAnnouncementsPage() {
   const load = () => {
     api('/announcements/admin?status=all')
       .then((data) => setItems(Array.isArray(data) ? data : []))
-      .catch((err) => setMessage(err.message || '公告加载失败'));
+      .catch((err) => showAppToast(err.message || '公告加载失败'));
   };
 
   useEffect(() => {
@@ -94,11 +95,11 @@ export default function AdminAnnouncementsPage() {
         body: JSON.stringify(form),
       });
 
-      setMessage(editingId ? '公告已保存。' : '公告已创建。');
+      showAppToast(editingId ? '公告已保存。' : '公告已创建。');
       reset();
       load();
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -111,10 +112,10 @@ export default function AdminAnnouncementsPage() {
 
     try {
       await api(`/announcements/admin/${item.id}`, { method: 'DELETE' });
-      setMessage('公告已归档。');
+      showAppToast('公告已归档。');
       load();
     } catch (err: any) {
-      setMessage(err.message || '归档失败');
+      showAppToast(err.message || '归档失败');
     }
   };
 

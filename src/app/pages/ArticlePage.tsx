@@ -7,6 +7,7 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { CommentSection } from '../components/CommentSection';
 import { applyPageSeoMeta, resetPageSeoMeta } from '../components/SiteMeta';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 const SITE_URL = 'https://mooncci.site';
 
@@ -47,14 +48,14 @@ function absoluteUrl(value?: string) {
 export default function ArticlePage() {
   const { id } = useParams();
   const [post, setPost] = useState<any>(null);
-  const [message, setMessage] = useState('正在加载文章...');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!id) return undefined;
 
     let active = true;
     setPost(null);
-    setMessage('正在加载文章...');
+    showAppToast('正在加载文章...');
 
     api(`/posts/${id}`)
       .then((data) => {
@@ -66,7 +67,7 @@ export default function ArticlePage() {
       })
       .catch((err) => {
         if (!active) return;
-        setMessage(err.message || '文章加载失败');
+        showAppToast(err.message || '文章加载失败');
       });
 
     return () => {

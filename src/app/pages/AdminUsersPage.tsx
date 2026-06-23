@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -9,7 +10,7 @@ export default function AdminUsersPage() {
   const loadUsers = () => {
     api('/admin/users')
       .then(setUsers)
-      .catch((err) => setMessage(err.message || '用户加载失败，请确认当前账号是管理员'));
+      .catch((err) => showAppToast(err.message || '用户加载失败，请确认当前账号是管理员'));
   };
 
   useEffect(() => {
@@ -27,10 +28,10 @@ export default function AdminUsersPage() {
         }),
       });
 
-      setMessage('更新成功');
+      showAppToast('更新成功');
       loadUsers();
     } catch (err: any) {
-      setMessage(err.message || '更新失败');
+      showAppToast(err.message || '更新失败');
     }
   };
 
@@ -39,10 +40,10 @@ export default function AdminUsersPage() {
 
     try {
       await api(`/admin/users/${id}`, { method: 'DELETE' });
-      setMessage('删除成功');
+      showAppToast('删除成功');
       loadUsers();
     } catch (err: any) {
-      setMessage(err.message || '删除失败');
+      showAppToast(err.message || '删除失败');
     }
   };
 

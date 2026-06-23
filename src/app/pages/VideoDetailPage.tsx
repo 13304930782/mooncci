@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { BarChart3, CheckCircle2, LogIn, Star } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
+import { showAppToast } from '../components/AppToast';
 
 type VideoDetail = {
   id: number;
   title: string;
   summary?: string;
   team_name?: string;
+  class_code?: string;
+  class_label?: string;
+  allowed_class_labels?: string[];
+  allowed_class_codes?: string[];
   speaker_names?: string;
   source_type?: 'local' | 'direct' | 'embed';
   source_label?: string;
@@ -18,6 +24,7 @@ type VideoDetail = {
   embed_url?: string | null;
   provider?: string | null;
   cover_image?: string;
+  public_scoring_enabled?: number;
   score_count: number;
   avg_total_score?: number | null;
   avg_content_score?: number | null;
@@ -27,6 +34,18 @@ type VideoDetail = {
 };
 
 type ScoreForm = {
+  presentation_appearance_score: number;
+  presentation_language_score: number;
+  presentation_timing_score: number;
+  principle_analysis_score: number;
+  code_analysis_score: number;
+  algorithm_design_score: number;
+  implementation_score: number;
+  logic_quality_score: number;
+  ui_design_score: number;
+  extra_feature_score: number;
+  answer_clarity_score: number;
+  knowledge_score: number;
   content_score: number;
   delivery_score: number;
   technical_score: number;
@@ -34,26 +53,87 @@ type ScoreForm = {
   comment: string;
 };
 
+type PublicScoreStatus = {
+  exists: boolean;
+  message: string;
+  score?: (Partial<ScoreForm> & {
+    updated_at?: string;
+    scorer_ip?: string;
+    total_score?: number;
+    max_score?: number;
+  }) | null;
+};
+
 const dimensions = [
-  { key: 'content_score', label: '内容完整度', help: '结构、重点、材料完整性' },
-  { key: 'delivery_score', label: '表达展示', help: '讲解清晰度、节奏和页面展示' },
-  { key: 'technical_score', label: '技术实现', help: '方案完成度、功能质量和细节' },
-  { key: 'defense_score', label: '答辩表现', help: '回答问题、总结和临场表达' },
+  { key: 'presentation_appearance_score', group: '自述', label: '仪表与态度', help: '仪表大方，衣着端庄，严肃认真', max: 1 },
+  { key: 'presentation_language_score', group: '自述', label: '语言与条理', help: '语言简洁、条理清晰，抓住报告项目主要工作', max: 2 },
+  { key: 'presentation_timing_score', group: '自述', label: '时间掌握', help: '精准掌握自述时间，限制 3 分钟', max: 2 },
+  { key: 'principle_analysis_score', group: '项目分析、设计与实现', label: '基本原理说明', help: '能够清晰说明本和分析涉及到的基本原理', max: 5 },
+  { key: 'code_analysis_score', group: '项目分析、设计与实现', label: '内核代码分析', help: '能够准确完成内核代码分析', max: 5 },
+  { key: 'algorithm_design_score', group: '项目分析、设计与实现', label: '模拟算法设计', help: '完成模拟算法设计', max: 6 },
+  { key: 'implementation_score', group: '项目分析、设计与实现', label: '运行与功能完整性', help: '程序运行流畅，功能实现完整', max: 5 },
+  { key: 'logic_quality_score', group: '项目分析、设计与实现', label: '算法逻辑', help: '算法逻辑清晰、合理、严谨', max: 5 },
+  { key: 'ui_design_score', group: '项目分析、设计与实现', label: '交互与菜单设计', help: '人机交互界面及菜单设计精美', max: 5 },
+  { key: 'extra_feature_score', group: '项目分析、设计与实现', label: '扩展功能', help: '在完成任务功能的基础上实现其他功能', max: 4 },
+  { key: 'answer_clarity_score', group: '回答问题', label: '回答思路', help: '语言简练、思路清晰，反映敏捷', max: 4 },
+  { key: 'knowledge_score', group: '回答问题', label: '专业知识掌握', help: '专业知识熟练掌握，回答流畅正确', max: 6 },
+] as const;
+
+const scoreGroups = [
+  { title: '自述（5分）', group: '自述' },
+  { title: '项目的分析、设计与实现（35分）', group: '项目分析、设计与实现' },
+  { title: '回答问题（10分）', group: '回答问题' },
 ] as const;
 
 const emptyScore: ScoreForm = {
-  content_score: 8,
-  delivery_score: 8,
-  technical_score: 8,
-  defense_score: 8,
+  presentation_appearance_score: 0,
+  presentation_language_score: 0,
+  presentation_timing_score: 0,
+  principle_analysis_score: 0,
+  code_analysis_score: 0,
+  algorithm_design_score: 0,
+  implementation_score: 0,
+  logic_quality_score: 0,
+  ui_design_score: 0,
+  extra_feature_score: 0,
+  answer_clarity_score: 0,
+  knowledge_score: 0,
+  content_score: 0,
+  delivery_score: 0,
+  technical_score: 0,
+  defense_score: 0,
   comment: '',
 };
 
-type ScoreKey = Exclude<keyof ScoreForm, 'comment'>;
+type ScoreKey = typeof dimensions[number]['key'];
 
 function formatScore(value?: number | null) {
   if (value == null) return '暂无';
   return Number(value).toFixed(1);
+}
+
+function buildScoreForm(score?: Partial<ScoreForm> | null): ScoreForm {
+  const next = { ...emptyScore };
+
+  dimensions.forEach((item) => {
+    const value = Number(score?.[item.key] ?? 0);
+    next[item.key] = Math.max(0, Math.min(item.max, Number.isInteger(value) ? value : 0));
+  });
+
+  next.content_score = Number(score?.content_score || 0);
+  next.delivery_score = Number(score?.delivery_score || 0);
+  next.technical_score = Number(score?.technical_score || 0);
+  next.defense_score = Number(score?.defense_score || 0);
+  next.comment = score?.comment || '';
+
+  return next;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('zh-CN', { hour12: false });
 }
 
 function getSourceLabel(video: VideoDetail) {
@@ -67,12 +147,29 @@ function getSourceLabel(video: VideoDetail) {
   return '本地上传';
 }
 
+function getGroupNumber(teamName?: string) {
+  return String(teamName || '').match(/\d+/)?.[0] || '';
+}
+
+function getDisplayTeamName(teamName?: string) {
+  const groupNumber = getGroupNumber(teamName);
+  if (groupNumber) return `第${groupNumber}组`;
+  return teamName || '';
+}
+
+function getVideoDisplayTitle(video: VideoDetail) {
+  const groupNumber = getGroupNumber(video.team_name);
+  if (groupNumber) return `第${groupNumber}组答辩视频`;
+  if (video.team_name) return `${video.team_name}答辩视频`;
+  return video.title;
+}
+
 function VideoPlayer({ video }: { video: VideoDetail }) {
   if (video.source_type === 'embed' && video.embed_url) {
     return (
       <iframe
         src={video.embed_url}
-        title={video.title}
+        title={getVideoDisplayTitle(video)}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
@@ -103,15 +200,23 @@ function VideoPlayer({ video }: { video: VideoDetail }) {
 
 export default function VideoDetailPage() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [form, setForm] = useState<ScoreForm>(emptyScore);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [scorerName, setScorerName] = useState('');
+  const [scorerGroupNumber, setScorerGroupNumber] = useState('');
+  const [identityChecked, setIdentityChecked] = useState(false);
+  const [scoreStatus, setScoreStatus] = useState<PublicScoreStatus | null>(null);
+  const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
+  const selectedClassLabel = getVideoClassLabel(selectedClassCode);
 
   const totalScore = useMemo(
-    () => form.content_score + form.delivery_score + form.technical_score + form.defense_score,
+    () => dimensions.reduce((sum, item) => sum + Number(form[item.key] || 0), 0),
     [form]
   );
 
@@ -126,16 +231,10 @@ export default function VideoDetailPage() {
       .then(([videoRow, myScore]) => {
         setVideo(videoRow);
         if (myScore) {
-          setForm({
-            content_score: Number(myScore.content_score || 8),
-            delivery_score: Number(myScore.delivery_score || 8),
-            technical_score: Number(myScore.technical_score || 8),
-            defense_score: Number(myScore.defense_score || 8),
-            comment: myScore.comment || '',
-          });
+          setForm(buildScoreForm(myScore));
         }
       })
-      .catch((err) => setMessage(err.message || '视频加载失败'))
+      .catch((err) => showAppToast(err.message || '视频加载失败'))
       .finally(() => setLoading(false));
   };
 
@@ -144,28 +243,110 @@ export default function VideoDetailPage() {
   }, [id, user?.id]);
 
   const updateScore = (key: ScoreKey, value: string) => {
-    const next = Math.max(1, Math.min(10, Number(value) || 1));
+    const max = dimensions.find((item) => item.key === key)?.max || 10;
+    const next = Math.max(0, Math.min(max, Number(value) || 0));
     setForm((current) => ({ ...current, [key]: next }));
   };
 
-  const submitScore = async () => {
-    if (!id || !user) return;
+  const checkPublicScore = async () => {
+    if (!id || !video) return;
+
+    const normalizedScorerName = scorerName.trim().replace(/\s+/g, ' ');
+    const normalizedScorerGroupNumber = scorerGroupNumber.trim();
+    const normalizedScorerGroupName = normalizedScorerGroupNumber ? `第${normalizedScorerGroupNumber}组` : '';
+
+    if (!selectedClassCode) {
+      showAppToast('请先选择你的班级。');
+      return;
+    }
+
+    if (!normalizedScorerGroupName) {
+      showAppToast('请先填写你的组号。');
+      return;
+    }
+
+    if (!normalizedScorerName) {
+      showAppToast('请先填写姓名。');
+      return;
+    }
 
     try {
       setSaving(true);
       setMessage('');
-      const result = await api(`/videos/${id}/score`, {
-        method: 'POST',
-        body: JSON.stringify(form),
+      const query = new URLSearchParams({
+        scorer_class_code: selectedClassCode,
+        scorer_group_name: normalizedScorerGroupName,
+        scorer_name: normalizedScorerName,
       });
-      setVideo(result.video);
-      setMessage('评分已保存，可以继续修改后重新提交。');
+      const result = await api(`/videos/${id}/public-score-status?${query.toString()}`);
+      setIdentityChecked(true);
+      setScoreStatus(result);
+      setForm(result.score ? buildScoreForm(result.score) : emptyScore);
+      showAppToast(result.message || (result.exists ? '已找到历史评分。' : '暂无评分记录。'));
     } catch (err: any) {
-      setMessage(err.message || '评分保存失败');
+      setIdentityChecked(false);
+      setScoreStatus(null);
+      showAppToast(err.message || '评分记录查询失败');
     } finally {
       setSaving(false);
     }
   };
+
+  const submitScore = async () => {
+    if (!id || !video) return;
+
+    const publicScoring = Number(video.public_scoring_enabled || 0) === 1;
+    const normalizedScorerName = scorerName.trim().replace(/\s+/g, ' ');
+    const normalizedScorerGroupNumber = scorerGroupNumber.trim();
+    const normalizedScorerGroupName = normalizedScorerGroupNumber ? `第${normalizedScorerGroupNumber}组` : '';
+
+    if (publicScoring && !normalizedScorerName) {
+      showAppToast('请先填写姓名。');
+      return;
+    }
+
+    if (publicScoring && !selectedClassCode) {
+      showAppToast('请先选择你的班级。');
+      return;
+    }
+
+    if (publicScoring && !normalizedScorerGroupName) {
+      showAppToast('请先填写你的组号。');
+      return;
+    }
+
+    if (publicScoring && !identityChecked) {
+      showAppToast('请先点击“确认信息”，查询是否已有评分。');
+      return;
+    }
+
+    if (!publicScoring && !user) return;
+
+    try {
+      setSaving(true);
+      setMessage('');
+      const result = await api(publicScoring ? `/videos/${id}/public-score` : `/videos/${id}/score`, {
+        method: 'POST',
+        body: JSON.stringify(publicScoring ? {
+          ...form,
+          scorer_name: normalizedScorerName,
+          scorer_class_code: selectedClassCode,
+          scorer_group_name: normalizedScorerGroupName,
+        } : form),
+      });
+      setVideo(result.video);
+      if (publicScoring && result.score) {
+        setScoreStatus({ exists: true, message: '评分已保存，可继续修改后替换。', score: result.score });
+      }
+      showAppToast(publicScoring ? '评分已保存，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
+    } catch (err: any) {
+      showAppToast(err.message || '评分保存失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const publicScoringEnabled = Number(video?.public_scoring_enabled || 0) === 1;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_30rem),linear-gradient(135deg,#f8fafc,#eef6ff_48%,#f8fafc)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_30rem),linear-gradient(135deg,#020617,#0f172a_55%,#020617)] dark:text-white">
@@ -197,12 +378,12 @@ export default function VideoDetailPage() {
 
               <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/85 p-6 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/85">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  {video.team_name && <span>{video.team_name}</span>}
+                  {getDisplayTeamName(video.team_name) && <span>{getDisplayTeamName(video.team_name)}</span>}
                   {video.speaker_names && <span>主讲：{video.speaker_names}</span>}
                   <span>{getSourceLabel(video)}</span>
                 </div>
                 <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white">
-                  {video.title}
+                  {getVideoDisplayTitle(video)}
                 </h1>
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-8 text-slate-600 dark:text-slate-300">
                   {video.summary || '暂无简介'}
@@ -220,7 +401,7 @@ export default function VideoDetailPage() {
                   <div className="rounded-lg bg-blue-50 p-3 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
                     <div className="text-xs opacity-80">综合均分</div>
                     <div className="mt-1 text-2xl font-black">{formatScore(video.avg_total_score)}</div>
-                    <div className="mt-1 text-xs opacity-80">满分 40</div>
+                    <div className="mt-1 text-xs opacity-80">满分 50</div>
                   </div>
                   <div className="rounded-lg bg-slate-100 p-3 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     <div className="text-xs opacity-80">评分人数</div>
@@ -229,10 +410,9 @@ export default function VideoDetailPage() {
                   </div>
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                  <div>内容完整度：{formatScore(video.avg_content_score)} / 10</div>
-                  <div>表达展示：{formatScore(video.avg_delivery_score)} / 10</div>
-                  <div>技术实现：{formatScore(video.avg_technical_score)} / 10</div>
-                  <div>答辩表现：{formatScore(video.avg_defense_score)} / 10</div>
+                  <div>自述：{formatScore(video.avg_content_score)} / 5</div>
+                  <div>项目分析、设计与实现：{formatScore(video.avg_technical_score)} / 35</div>
+                  <div>回答问题：{formatScore(video.avg_defense_score)} / 10</div>
                 </div>
               </section>
 
@@ -242,7 +422,7 @@ export default function VideoDetailPage() {
                   我的评分
                 </div>
 
-                {!user ? (
+                {!publicScoringEnabled && !user ? (
                   <div className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     登录后可以评分和填写点评。
                     <Link to={`/login?redirect=/videos/${id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">
@@ -252,57 +432,165 @@ export default function VideoDetailPage() {
                   </div>
                 ) : (
                   <div className="mt-4 space-y-4">
-                    {dimensions.map((item) => (
-                      <label key={item.key} className="block">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white">{item.label}</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">{item.help}</div>
-                          </div>
-                          <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-sm font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
-                            {form[item.key]}
-                          </span>
+                    {publicScoringEnabled && (
+                      <div className="block rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
+                        <div className="mb-4 grid gap-3">
+                          <label className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">班级（必选）</div>
+                            <select
+                              value={selectedClassCode}
+                              onChange={(event) => {
+                                const next = event.target.value;
+                                setIdentityChecked(false);
+                                setScoreStatus(null);
+                                setSearchParams(next ? { class: next } : {});
+                              }}
+                              className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
+                            >
+                              <option value="">请选择班级</option>
+                              {videoClassOptions.map((item) => (
+                                <option key={item.code} value={item.code}>{item.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">组号（必填）</div>
+                            <div className="mt-2 flex overflow-hidden rounded-lg border border-blue-200 bg-white focus-within:border-blue-500 dark:border-blue-900 dark:bg-slate-950">
+                              <span className="flex items-center border-r border-blue-100 bg-blue-50 px-3 text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                                第
+                              </span>
+                              <input
+                                value={scorerGroupNumber}
+                                onChange={(event) => {
+                                  setIdentityChecked(false);
+                                  setScoreStatus(null);
+                                  setScorerGroupNumber(event.target.value.replace(/\D/g, '').slice(0, 2));
+                                }}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+                                placeholder="1"
+                              />
+                              <span className="flex items-center border-l border-blue-100 bg-blue-50 px-3 text-sm font-semibold text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                                组
+                              </span>
+                            </div>
+                          </label>
                         </div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">姓名（必填）</div>
                         <input
-                          type="range"
-                          min="1"
-                          max="10"
-                          value={form[item.key]}
-                          onChange={(event) => updateScore(item.key, event.target.value)}
-                          className="mt-2 w-full"
+                          value={scorerName}
+                          onChange={(event) => {
+                            setIdentityChecked(false);
+                            setScoreStatus(null);
+                            setScorerName(event.target.value);
+                          }}
+                          maxLength={100}
+                          className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
+                          placeholder="请填写自己的姓名"
                         />
-                      </label>
-                    ))}
+                        <p className="mt-2 text-xs leading-5 text-blue-700 dark:text-blue-200">
+                          先确认信息；如果已有评分，会回填上次评分并允许直接替换。
+                        </p>
+                        <button
+                          type="button"
+                          onClick={checkPublicScore}
+                          disabled={saving}
+                          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-950"
+                        >
+                          {saving ? '查询中...' : '确认信息'}
+                        </button>
+                        {scoreStatus && (
+                          <div className={`mt-3 rounded-lg px-3 py-2 text-xs leading-5 ${scoreStatus.exists ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200'}`}>
+                            <div>{scoreStatus.message}</div>
+                            {scoreStatus.exists && scoreStatus.score && (
+                              <div className="mt-1">
+                                上次提交：{formatDateTime(scoreStatus.score.updated_at) || '未知时间'}；IP：{scoreStatus.score.scorer_ip || '未知'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                    <div className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                      本次总分：<span className="font-black text-blue-700 dark:text-blue-200">{totalScore}</span> / 40
-                    </div>
-
-                    <label className="block">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">点评</div>
-                      <textarea
-                        value={form.comment}
-                        onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
-                        rows={4}
-                        className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950"
-                        placeholder="写下亮点、问题或改进建议"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={submitScore}
-                      disabled={saving}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      {saving ? '保存中...' : '提交评分'}
-                    </button>
+                    {publicScoringEnabled && !identityChecked && (
+                      <div className="rounded-lg bg-slate-100 p-3 text-xs leading-5 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        确认班级、组号和姓名后，下方会显示完整评分表。
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
             </aside>
           </div>
+        )}
+
+        {video && (!publicScoringEnabled || identityChecked) && (!publicScoringEnabled ? Boolean(user) : true) && (
+          <section className="mt-6 rounded-xl border border-slate-200/70 bg-white/90 p-5 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/90">
+            <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-sm font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Score Sheet</div>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">评审小组评分记录表</h2>
+              </div>
+              <div className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                本次总分：<span className="text-xl font-black">{totalScore}</span> / 50
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.7fr_0.9fr]">
+              {scoreGroups.map((scoreGroup) => (
+                <div key={scoreGroup.group} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                  <h3 className="text-center text-base font-black text-slate-950 dark:text-white">{scoreGroup.title}</h3>
+                  <div className="mt-4 space-y-4">
+                    {dimensions.filter((item) => item.group === scoreGroup.group).map((item) => (
+                      <label key={item.key} className="block rounded-lg bg-white p-3 shadow-sm shadow-slate-950/5 dark:bg-slate-900">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-slate-950 dark:text-white">{item.label}</div>
+                            <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{item.help}</div>
+                          </div>
+                          <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-sm font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                            {form[item.key]} / {item.max}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max={item.max}
+                          value={form[item.key]}
+                          onChange={(event) => updateScore(item.key, event.target.value)}
+                          className="mt-3 w-full"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <label className="block">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">点评</div>
+                <textarea
+                  value={form.comment}
+                  onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
+                  rows={4}
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="写下亮点、问题或改进建议"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={submitScore}
+                disabled={saving}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {saving ? '提交中...' : scoreStatus?.exists ? '替换评分' : '提交评分'}
+              </button>
+            </div>
+          </section>
         )}
       </main>
 

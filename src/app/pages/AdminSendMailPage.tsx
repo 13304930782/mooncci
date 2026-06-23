@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Mail, Send } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 export default function AdminSendMailPage() {
   const [to, setTo] = useState('');
@@ -13,17 +14,17 @@ export default function AdminSendMailPage() {
     event.preventDefault();
 
     if (!to.trim()) {
-      setMessage('请填写收件人邮箱');
+      showAppToast('请填写收件人邮箱');
       return;
     }
 
     if (!subject.trim()) {
-      setMessage('请填写邮件标题');
+      showAppToast('请填写邮件标题');
       return;
     }
 
     if (!content.trim()) {
-      setMessage('请填写邮件内容');
+      showAppToast('请填写邮件内容');
       return;
     }
 
@@ -36,11 +37,11 @@ export default function AdminSendMailPage() {
         body: JSON.stringify({ to, subject, content }),
       });
 
-      setMessage(res.message || '邮件已发送');
+      showAppToast(res.message || '邮件已发送');
       setSubject('');
       setContent('');
     } catch (err: any) {
-      setMessage(err.message || '邮件发送失败');
+      showAppToast(err.message || '邮件发送失败');
     } finally {
       setSending(false);
     }
