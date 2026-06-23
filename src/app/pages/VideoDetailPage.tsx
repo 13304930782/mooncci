@@ -79,6 +79,12 @@ const dimensions = [
   { key: 'knowledge_score', group: '回答问题', label: '专业知识掌握', help: '专业知识熟练掌握，回答流畅正确', max: 6 },
 ] as const;
 
+const scoreGroups = [
+  { title: '自述（5分）', group: '自述' },
+  { title: '项目的分析、设计与实现（35分）', group: '项目分析、设计与实现' },
+  { title: '回答问题（10分）', group: '回答问题' },
+] as const;
+
 const emptyScore: ScoreForm = {
   presentation_appearance_score: 0,
   presentation_language_score: 0,
@@ -507,15 +513,43 @@ export default function VideoDetailPage() {
                       </div>
                     )}
 
-                    {(!publicScoringEnabled || identityChecked) && dimensions.map((item) => (
-                      <label key={item.key} className="block">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-300">{item.group}</div>
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white">{item.label}</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400">{item.help}</div>
+                    {publicScoringEnabled && !identityChecked && (
+                      <div className="rounded-lg bg-slate-100 p-3 text-xs leading-5 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        确认班级、组号和姓名后，下方会显示完整评分表。
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            </aside>
+          </div>
+        )}
+
+        {video && (!publicScoringEnabled || identityChecked) && (!publicScoringEnabled ? Boolean(user) : true) && (
+          <section className="mt-6 rounded-xl border border-slate-200/70 bg-white/90 p-5 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/90">
+            <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-sm font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Score Sheet</div>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950 dark:text-white">评审小组评分记录表</h2>
+              </div>
+              <div className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                本次总分：<span className="text-xl font-black">{totalScore}</span> / 50
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.7fr_0.9fr]">
+              {scoreGroups.map((scoreGroup) => (
+                <div key={scoreGroup.group} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                  <h3 className="text-center text-base font-black text-slate-950 dark:text-white">{scoreGroup.title}</h3>
+                  <div className="mt-4 space-y-4">
+                    {dimensions.filter((item) => item.group === scoreGroup.group).map((item) => (
+                      <label key={item.key} className="block rounded-lg bg-white p-3 shadow-sm shadow-slate-950/5 dark:bg-slate-900">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-slate-950 dark:text-white">{item.label}</div>
+                            <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{item.help}</div>
                           </div>
-                          <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-sm font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                          <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-sm font-black text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
                             {form[item.key]} / {item.max}
                           </span>
                         </div>
@@ -525,42 +559,38 @@ export default function VideoDetailPage() {
                           max={item.max}
                           value={form[item.key]}
                           onChange={(event) => updateScore(item.key, event.target.value)}
-                          className="mt-2 w-full"
+                          className="mt-3 w-full"
                         />
                       </label>
                     ))}
-
-                    {(!publicScoringEnabled || identityChecked) && (
-                      <div className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        本次总分：<span className="font-black text-blue-700 dark:text-blue-200">{totalScore}</span> / 50
-                      </div>
-                    )}
-
-                    {(!publicScoringEnabled || identityChecked) && <label className="block">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">点评</div>
-                      <textarea
-                        value={form.comment}
-                        onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
-                        rows={4}
-                        className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950"
-                        placeholder="写下亮点、问题或改进建议"
-                      />
-                    </label>}
-
-                    {(!publicScoringEnabled || identityChecked) && <button
-                      type="button"
-                      onClick={submitScore}
-                      disabled={saving}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      {saving ? '提交中...' : scoreStatus?.exists ? '替换评分' : '提交评分'}
-                    </button>}
                   </div>
-                )}
-              </section>
-            </aside>
-          </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <label className="block">
+                <div className="text-sm font-semibold text-slate-900 dark:text-white">点评</div>
+                <textarea
+                  value={form.comment}
+                  onChange={(event) => setForm((current) => ({ ...current, comment: event.target.value }))}
+                  rows={4}
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="写下亮点、问题或改进建议"
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={submitScore}
+                disabled={saving}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {saving ? '提交中...' : scoreStatus?.exists ? '替换评分' : '提交评分'}
+              </button>
+            </div>
+          </section>
         )}
       </main>
 
