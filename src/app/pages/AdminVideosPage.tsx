@@ -71,7 +71,6 @@ type RankingRow = {
   avg_technical_score?: number | null;
   avg_defense_score?: number | null;
   weighted_score?: number | null;
-  trimmed_weighted_score?: number | null;
   score_stddev?: number | null;
   participation_bonus?: number | null;
   consistency_bonus?: number | null;
@@ -465,7 +464,7 @@ export default function AdminVideosPage() {
                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
               >
                 <Download className="h-4 w-4" />
-                导出 Excel 可打开文件
+                导出评分记录表
               </a>
             </div>
           </div>
@@ -479,7 +478,6 @@ export default function AdminVideosPage() {
                   <th className="py-3 pr-4">评分人数</th>
                   <th className="py-3 pr-4">最终排名分</th>
                   <th className="py-3 pr-4">归一化均分</th>
-                  <th className="py-3 pr-4">去极值均分</th>
                   <th className="py-3 pr-4">自述</th>
                   <th className="py-3 pr-4">项目</th>
                   <th className="py-3 pr-4">回答</th>
@@ -496,7 +494,6 @@ export default function AdminVideosPage() {
                     <td className="py-3 pr-4">{row.score_count}</td>
                     <td className="py-3 pr-4 font-black text-blue-700">{formatFinalScore(row.final_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.weighted_score)}</td>
-                    <td className="py-3 pr-4">{formatFinalScore(row.trimmed_weighted_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_content_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_technical_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_defense_score)}</td>
@@ -504,7 +501,7 @@ export default function AdminVideosPage() {
                 ))}
                 {rankings.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
+                    <td colSpan={8} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
                   </tr>
                 )}
               </tbody>

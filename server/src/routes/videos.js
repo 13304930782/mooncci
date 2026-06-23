@@ -37,18 +37,18 @@ const classOptions = [
 const classCodes = new Set(classOptions.map((item) => item.code));
 
 const detailedScoreFields = [
-  { key: 'presentation_appearance_score', max: 1 },
-  { key: 'presentation_language_score', max: 2 },
-  { key: 'presentation_timing_score', max: 2 },
-  { key: 'principle_analysis_score', max: 5 },
-  { key: 'code_analysis_score', max: 5 },
-  { key: 'algorithm_design_score', max: 6 },
-  { key: 'implementation_score', max: 5 },
-  { key: 'logic_quality_score', max: 5 },
-  { key: 'ui_design_score', max: 5 },
-  { key: 'extra_feature_score', max: 4 },
-  { key: 'answer_clarity_score', max: 4 },
-  { key: 'knowledge_score', max: 6 },
+  { key: 'presentation_appearance_score', label: '仪表大方，衣着端庄，严肃认真（1分）', max: 1 },
+  { key: 'presentation_language_score', label: '语言简洁、条理清晰，抓住报告项目主要工作（2分）', max: 2 },
+  { key: 'presentation_timing_score', label: '精准掌握自述时间（限制3分钟）（2分）', max: 2 },
+  { key: 'principle_analysis_score', label: '能够清晰说明本和分析涉及到的基本原理（5分）', max: 5 },
+  { key: 'code_analysis_score', label: '能够准确完成内核代码分析（5分）', max: 5 },
+  { key: 'algorithm_design_score', label: '完成模拟算法设计（6分）', max: 6 },
+  { key: 'implementation_score', label: '程序运行流畅，功能实现完整（5分）', max: 5 },
+  { key: 'logic_quality_score', label: '算法逻辑清晰、合理、严谨（5分）', max: 5 },
+  { key: 'ui_design_score', label: '人机交互界面及菜单设计精美（5分）', max: 5 },
+  { key: 'extra_feature_score', label: '在完成任务功能的基础上，实现其他功能（4分）', max: 4 },
+  { key: 'answer_clarity_score', label: '语言简练，思路清晰，反映敏捷（4分）', max: 4 },
+  { key: 'knowledge_score', label: '专业知识熟练掌握，回答流畅正确（6分）', max: 6 },
 ];
 
 const detailedScoreKeys = detailedScoreFields.map((item) => item.key);
@@ -757,9 +757,6 @@ function buildRankingRows(videos, scoreRows) {
     const scoreCount = weightedScores.length;
 
     const weightedAvg = average(weightedScores);
-    const trimmedScores = [...weightedScores].sort((a, b) => a - b);
-    const effectiveScores = trimmedScores.length >= 5 ? trimmedScores.slice(1, -1) : trimmedScores;
-    const trimmedWeightedAvg = average(effectiveScores);
     const scoreStddev = stddev(weightedScores, weightedAvg);
 
     const scorePartRows = scores.map(scoreParts);
@@ -768,9 +765,9 @@ function buildRankingRows(videos, scoreRows) {
     const avgTechnical = average(scorePartRows.map((row) => Number(row.project || 0)));
     const avgDefense = average(scorePartRows.map((row) => Number(row.answer || 0)));
 
-    // 最终排名分：主体是全班加权均分；人数和稳定度只做小幅校正；最后用维度小权重拆平分。
+    // 最终排名分：主体是全班均分；人数和稳定度只做小幅校正；最后用维度小权重拆平分。
     // 这样不会因为同分而全挤在一起，也不会让随机 id 影响排名。
-    const baseScore100 = trimmedWeightedAvg == null ? null : trimmedWeightedAvg;
+    const baseScore100 = weightedAvg == null ? null : weightedAvg;
     const participationBonus = maxScoreCount > 0 ? Math.min(scoreCount / maxScoreCount, 1) * 0.30 : 0;
     const consistencyBonus = scoreStddev == null ? 0 : Math.max(0, 1 - Math.min(scoreStddev / 2.5, 1)) * 0.20;
     const tieBreaker = scoreCount > 0
@@ -792,8 +789,7 @@ function buildRankingRows(videos, scoreRows) {
       avg_delivery_score: roundNumber(avgDelivery, 2),
       avg_technical_score: roundNumber(avgTechnical, 2),
       avg_defense_score: roundNumber(avgDefense, 2),
-      weighted_score: roundNumber(weightedAvg == null ? null : weightedAvg * 10, 3),
-      trimmed_weighted_score: roundNumber(baseScore100, 3),
+      weighted_score: roundNumber(weightedAvg, 3),
       score_stddev: roundNumber(scoreStddev, 3),
       participation_bonus: roundNumber(participationBonus, 3),
       consistency_bonus: roundNumber(consistencyBonus, 3),
@@ -872,6 +868,40 @@ async function fetchRankingRows(user, filters = {}) {
   return buildRankingRows(videos, scoreRows);
 }
 
+async function fetchScoreRecordRows(user, filters = {}) {
+  const videos = await fetchAdminVideos(user, filters);
+  const videoIds = videos.map((video) => Number(video.id));
+  if (!videoIds.length) return [];
+
+  const videoById = new Map(videos.map((video) => [Number(video.id), video]));
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code);
+  const where = ['s.video_id IN (?)'];
+  const params = [videoIds];
+
+  if (scorerClassCode) {
+    where.push('s.scorer_class_code=?');
+    params.push(scorerClassCode);
+  }
+
+  const [scoreRows] = await db.query(
+    `
+    SELECT
+      s.*,
+      COALESCE(u.username, s.scorer_name) AS username
+    FROM video_scores s
+    LEFT JOIN users u ON u.id = s.user_id
+    WHERE ${where.join(' AND ')}
+    ORDER BY s.video_id ASC, s.scorer_class_code ASC, s.scorer_group_name ASC, s.updated_at ASC
+    `,
+    params
+  );
+
+  return scoreRows.map((score) => ({
+    video: videoById.get(Number(score.video_id)),
+    score: mapScoreRow(score),
+  })).filter((row) => row.video);
+}
+
 function csvCell(value) {
   const text = value == null ? '' : String(value);
   return `"${text.replace(/"/g, '""')}"`;
@@ -887,7 +917,6 @@ function buildRankingCsv(rows) {
     '评分人数',
     '最终排名分',
     '归一化均分',
-    '去极值均分',
     '自述均分',
     '项目均分',
     '回答均分',
@@ -910,7 +939,6 @@ function buildRankingCsv(rows) {
       row.score_count,
       row.final_score,
       row.weighted_score,
-      row.trimmed_weighted_score,
       row.avg_content_score,
       row.avg_technical_score,
       row.avg_defense_score,
@@ -924,6 +952,47 @@ function buildRankingCsv(rows) {
 
   lines.push('');
   lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计；旧40分评分会自动归一化参与排名。'].map(csvCell).join(','));
+
+  return `\ufeff${lines.join('\n')}`;
+}
+
+function buildScoreRecordCsv(rows) {
+  const now = new Date();
+  const headers = [
+    '班级',
+    '组别',
+    '评审班级',
+    '评审小组组别',
+    '评审人',
+    ...detailedScoreFields.map((field) => field.label),
+    '总分（50分）',
+    '评分日期',
+    'IP',
+    '点评',
+  ];
+
+  const lines = [
+    ['《操作系统》综合训练项目答辩——评审小组评分记录表'].map(csvCell).join(','),
+    ['训练项目名称', '操作系统综合训练项目答辩', '', '', '', '评审小组组别', '见评分明细'].map(csvCell).join(','),
+    ['答辩时间', `${now.getFullYear()}年`, `${now.getMonth() + 1}月`, `${now.getDate()}日`, '', '答辩地点', '', '答辩教师', ''].map(csvCell).join(','),
+    '',
+    headers.map(csvCell).join(','),
+  ];
+
+  rows.forEach(({ video, score }) => {
+    lines.push([
+      video.class_label || classLabel(video.class_code) || '',
+      video.team_name || '',
+      classLabel(score.scorer_class_code) || '',
+      score.scorer_group_name || '',
+      score.username || score.scorer_name || '',
+      ...detailedScoreFields.map((field) => score[field.key] ?? ''),
+      score.total_score,
+      score.updated_at || '',
+      score.scorer_ip || '',
+      score.comment || '',
+    ].map(csvCell).join(','));
+  });
 
   return `\ufeff${lines.join('\n')}`;
 }
@@ -987,9 +1056,9 @@ router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
 
 router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) => {
   try {
-    const rows = await fetchRankingRows(req.user, req.query);
-    const csv = buildRankingCsv(rows);
-    const filename = `video-ranking-${new Date().toISOString().slice(0, 10)}.csv`;
+    const rows = await fetchScoreRecordRows(req.user, req.query);
+    const csv = buildScoreRecordCsv(rows);
+    const filename = `video-score-records-${new Date().toISOString().slice(0, 10)}.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
