@@ -51,6 +51,17 @@ function isWriterRole(role?: string) {
   return role === 'owner' || role === 'admin' || role === 'editor';
 }
 
+function AuthCheckingScreen() {
+  return (
+    <div className="grid min-h-screen place-items-center bg-slate-50 px-6 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
+      <div className="text-center">
+        <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600 dark:border-slate-800 dark:border-t-blue-400" />
+        <p className="mt-4 text-sm font-semibold">正在验证登录状态...</p>
+      </div>
+    </div>
+  );
+}
+
 function Guard({
   children,
   adminOnly = false,
@@ -63,7 +74,7 @@ function Guard({
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <MooncciLoadingScreen />;
+    return <AuthCheckingScreen />;
   }
 
   if (!user) return <Navigate to="/login" />;
