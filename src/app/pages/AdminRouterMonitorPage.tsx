@@ -10,6 +10,7 @@ import {
   Server,
 } from 'lucide-react';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 type Metric = {
   id: number;
@@ -187,10 +188,10 @@ export default function AdminRouterMonitorPage() {
       setHistory(Array.isArray(historyRows) ? historyRows : []);
 
       if (!latestData?.metric) {
-        setMessage('暂无该设备数据，请确认路由器上报脚本已运行。');
+        showAppToast('暂无该设备数据，请确认路由器上报脚本已运行。');
       }
     } catch (err: any) {
-      setMessage(err.message || '运维监控加载失败');
+      showAppToast(err.message || '运维监控加载失败');
     } finally {
       setLoading(false);
     }

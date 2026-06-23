@@ -44,17 +44,17 @@ export default function EditorApplyPage() {
     event.preventDefault();
 
     if (!user) {
-      setMessage('请先登录后再提交申请');
+      showAppToast('请先登录后再提交申请');
       return;
     }
 
     if (canWrite(user.role)) {
-      setMessage('你当前已经拥有写作权限，无需提交编辑申请。');
+      showAppToast('你当前已经拥有写作权限，无需提交编辑申请。');
       return;
     }
 
     if (!reason.trim()) {
-      setMessage('请简单说明你申请成为编辑的原因');
+      showAppToast('请简单说明你申请成为编辑的原因');
       return;
     }
 
@@ -70,7 +70,7 @@ export default function EditorApplyPage() {
       showAppToast(res.message || '申请已提交，请等待管理员审核');
       setReason('');
     } catch (err: any) {
-      setMessage(err.message || '申请提交失败');
+      showAppToast(err.message || '申请提交失败');
     } finally {
       setLoading(false);
     }

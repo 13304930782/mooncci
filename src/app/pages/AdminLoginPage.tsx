@@ -3,6 +3,7 @@ import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { safeRoutePath } from '../lib/safeUrl';
 import { clearAuthCache } from '../lib/authToken';
+import { showAppToast } from '../components/AppToast';
 
 const DEFAULT_REDIRECT = '/admin/comments?status=pending';
 
@@ -12,7 +13,7 @@ export default function AdminLoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('为了审核评论，请登录管理员账号。');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -23,7 +24,7 @@ export default function AdminLoginPage() {
     event.preventDefault();
 
     if (!email || !password) {
-      setMessage('请填写管理员邮箱和密码');
+      showAppToast('请填写管理员邮箱和密码');
       return;
     }
 
@@ -53,7 +54,7 @@ export default function AdminLoginPage() {
 
       if (!['owner', 'admin'].includes(data.user?.role)) {
         clearAuthCache();
-        setMessage('这个账号不是站长或管理员账号，不能进入审核后台。请使用站长或管理员账号登录。');
+        showAppToast('这个账号不是站长或管理员账号，不能进入审核后台。请使用站长或管理员账号登录。');
         return;
       }
 
@@ -64,7 +65,7 @@ export default function AdminLoginPage() {
 
       window.location.replace(target);
     } catch (err: any) {
-      setMessage(err.message || '登录失败');
+      showAppToast(err.message || '登录失败');
     } finally {
       setLoading(false);
     }

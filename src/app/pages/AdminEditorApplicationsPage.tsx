@@ -11,7 +11,7 @@ export default function AdminEditorApplicationsPage() {
   const loadApplications = () => {
     api(`/admin/editor-applications?status=${status}`)
       .then(setApplications)
-      .catch((err) => setMessage(err.message || '申请加载失败'));
+      .catch((err) => showAppToast(err.message || '申请加载失败'));
   };
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function AdminEditorApplicationsPage() {
       showAppToast(res.message || '操作成功');
       loadApplications();
     } catch (err: any) {
-      setMessage(err.message || '操作失败');
+      showAppToast(err.message || '操作失败');
     }
   };
 

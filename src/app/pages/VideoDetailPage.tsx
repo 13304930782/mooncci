@@ -234,7 +234,7 @@ export default function VideoDetailPage() {
           setForm(buildScoreForm(myScore));
         }
       })
-      .catch((err) => setMessage(err.message || '视频加载失败'))
+      .catch((err) => showAppToast(err.message || '视频加载失败'))
       .finally(() => setLoading(false));
   };
 
@@ -256,17 +256,17 @@ export default function VideoDetailPage() {
     const normalizedScorerGroupName = normalizedScorerGroupNumber ? `第${normalizedScorerGroupNumber}组` : '';
 
     if (!selectedClassCode) {
-      setMessage('请先选择你的班级。');
+      showAppToast('请先选择你的班级。');
       return;
     }
 
     if (!normalizedScorerGroupName) {
-      setMessage('请先填写你的组号。');
+      showAppToast('请先填写你的组号。');
       return;
     }
 
     if (!normalizedScorerName) {
-      setMessage('请先填写姓名。');
+      showAppToast('请先填写姓名。');
       return;
     }
 
@@ -282,11 +282,11 @@ export default function VideoDetailPage() {
       setIdentityChecked(true);
       setScoreStatus(result);
       setForm(result.score ? buildScoreForm(result.score) : emptyScore);
-      setMessage(result.message || (result.exists ? '已找到历史评分。' : '暂无评分记录。'));
+      showAppToast(result.message || (result.exists ? '已找到历史评分。' : '暂无评分记录。'));
     } catch (err: any) {
       setIdentityChecked(false);
       setScoreStatus(null);
-      setMessage(err.message || '评分记录查询失败');
+      showAppToast(err.message || '评分记录查询失败');
     } finally {
       setSaving(false);
     }
@@ -301,22 +301,22 @@ export default function VideoDetailPage() {
     const normalizedScorerGroupName = normalizedScorerGroupNumber ? `第${normalizedScorerGroupNumber}组` : '';
 
     if (publicScoring && !normalizedScorerName) {
-      setMessage('请先填写姓名。');
+      showAppToast('请先填写姓名。');
       return;
     }
 
     if (publicScoring && !selectedClassCode) {
-      setMessage('请先选择你的班级。');
+      showAppToast('请先选择你的班级。');
       return;
     }
 
     if (publicScoring && !normalizedScorerGroupName) {
-      setMessage('请先填写你的组号。');
+      showAppToast('请先填写你的组号。');
       return;
     }
 
     if (publicScoring && !identityChecked) {
-      setMessage('请先点击“确认信息”，查询是否已有评分。');
+      showAppToast('请先点击“确认信息”，查询是否已有评分。');
       return;
     }
 
@@ -340,7 +340,7 @@ export default function VideoDetailPage() {
       }
       showAppToast(publicScoring ? '评分已保存，感谢参与。' : '评分已保存，可以继续修改后重新提交。');
     } catch (err: any) {
-      setMessage(err.message || '评分保存失败');
+      showAppToast(err.message || '评分保存失败');
     } finally {
       setSaving(false);
     }

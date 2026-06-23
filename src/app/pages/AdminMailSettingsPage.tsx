@@ -24,7 +24,7 @@ export default function AdminMailSettingsPage() {
   useEffect(() => {
     api('/settings/mail')
       .then((data) => setMail({ ...defaultMail, ...data }))
-      .catch((err) => setMessage(err.message || '邮件设置加载失败'));
+      .catch((err) => showAppToast(err.message || '邮件设置加载失败'));
   }, []);
 
   const update = (key: string, value: string) => {
@@ -47,7 +47,7 @@ export default function AdminMailSettingsPage() {
         setMail({ ...defaultMail, ...res.mail });
       }
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -65,7 +65,7 @@ export default function AdminMailSettingsPage() {
 
       showAppToast(res.message || '测试邮件已发送');
     } catch (err: any) {
-      setMessage(err.message || '测试邮件发送失败');
+      showAppToast(err.message || '测试邮件发送失败');
     } finally {
       setTesting(false);
     }

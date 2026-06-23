@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
 
     if (!email.trim()) {
-      setMessage('请填写邮箱');
+      showAppToast('请填写邮箱');
       return;
     }
 
@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
 
       showAppToast(res.message || '如果该邮箱存在，我们会发送密码重置邮件');
     } catch (err: any) {
-      setMessage(err.message || '发送失败，请稍后重试');
+      showAppToast(err.message || '发送失败，请稍后重试');
     } finally {
       setLoading(false);
     }

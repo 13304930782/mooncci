@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { api } from '../lib/api';
 import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
+import { showAppToast } from '../components/AppToast';
 
 type VideoItem = {
   id: number;
@@ -80,7 +81,7 @@ export default function VideosPage() {
     setLoading(true);
     api(`/videos${query}`)
       .then((rows) => setVideos(Array.isArray(rows) ? rows : []))
-      .catch((err) => setMessage(err.message || '视频加载失败'))
+      .catch((err) => showAppToast(err.message || '视频加载失败'))
       .finally(() => setLoading(false));
   }, [selectedClassCode]);
 

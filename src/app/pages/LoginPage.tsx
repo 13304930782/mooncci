@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, BookOpen, MessageCircle, Sparkles, UserRound, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { showAppToast } from '../components/AppToast';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -16,12 +17,12 @@ export default function LoginPage() {
     event.preventDefault();
 
     if (!email.trim()) {
-      setMessage('请填写邮箱');
+      showAppToast('请填写邮箱');
       return;
     }
 
     if (!password) {
-      setMessage('请填写密码');
+      showAppToast('请填写密码');
       return;
     }
 
@@ -37,7 +38,7 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      setMessage(err.message || '登录失败，请检查邮箱和密码');
+      showAppToast(err.message || '登录失败，请检查邮箱和密码');
     } finally {
       setLoading(false);
     }

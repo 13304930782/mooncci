@@ -20,17 +20,17 @@ export default function RegisterPage() {
     event.preventDefault();
 
     if (!username || !email || !password || !confirmPassword) {
-      setMessage('请完整填写用户名、邮箱、密码和确认密码');
+      showAppToast('请完整填写用户名、邮箱、密码和确认密码');
       return;
     }
 
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setMessage('密码至少 8 位，并且需要同时包含字母和数字');
+      showAppToast('密码至少 8 位，并且需要同时包含字母和数字');
       return;
     }
 
     if (password !== confirmPassword) {
-      setMessage('两次输入的密码不一致');
+      showAppToast('两次输入的密码不一致');
       return;
     }
 
@@ -42,7 +42,7 @@ export default function RegisterPage() {
       showAppToast('注册成功，即将跳转登录页');
       setTimeout(() => navigate('/login'), 700);
     } catch (err: any) {
-      setMessage(err.message || '注册失败');
+      showAppToast(err.message || '注册失败');
     } finally {
       setLoading(false);
     }

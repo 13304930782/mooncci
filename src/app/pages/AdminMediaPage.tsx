@@ -120,7 +120,7 @@ export default function AdminMediaPage() {
       const data = await api(`/upload/media?status=${status}`);
       setItems(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setMessage(err.message || '媒体库加载失败');
+      showAppToast(err.message || '媒体库加载失败');
     } finally {
       setLoading(false);
     }
@@ -199,7 +199,7 @@ export default function AdminMediaPage() {
       showAppToast(`上传成功：${result.url}`);
       await load();
     } catch (err: any) {
-      setMessage(err.message || '图片上传失败');
+      showAppToast(err.message || '图片上传失败');
     } finally {
       setUploading(false);
     }
@@ -210,7 +210,7 @@ export default function AdminMediaPage() {
       await copyText(text);
       showAppToast(`${label} 已复制`);
     } catch {
-      setMessage('复制失败，请手动复制');
+      showAppToast('复制失败，请手动复制');
     }
   };
 
@@ -233,7 +233,7 @@ export default function AdminMediaPage() {
       refreshSelected(updated);
       showAppToast('媒体信息已保存');
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -256,7 +256,7 @@ export default function AdminMediaPage() {
       refreshSelected(updated);
       showAppToast('文件名已修改，文章和站点设置中的旧链接已同步替换');
     } catch (err: any) {
-      setMessage(err.message || '改名失败');
+      showAppToast(err.message || '改名失败');
     } finally {
       setSaving(false);
     }
@@ -279,7 +279,7 @@ export default function AdminMediaPage() {
       refreshSelected(updated);
       showAppToast(`二次压缩完成：${updated.size_text}`);
     } catch (err: any) {
-      setMessage(err.message || '二次压缩失败');
+      showAppToast(err.message || '二次压缩失败');
     } finally {
       setSaving(false);
     }
@@ -308,7 +308,7 @@ export default function AdminMediaPage() {
           return;
         }
       } else {
-        setMessage(err.message || '删除失败');
+        showAppToast(err.message || '删除失败');
       }
     } finally {
       setSaving(false);
@@ -331,7 +331,7 @@ export default function AdminMediaPage() {
       showAppToast('媒体文件已恢复');
       await load();
     } catch (err: any) {
-      setMessage(err.message || '恢复失败');
+      showAppToast(err.message || '恢复失败');
     } finally {
       setSaving(false);
     }
@@ -354,7 +354,7 @@ export default function AdminMediaPage() {
       showAppToast('媒体文件已彻底删除');
       await load();
     } catch (err: any) {
-      setMessage(err.message || '彻底删除失败');
+      showAppToast(err.message || '彻底删除失败');
     } finally {
       setSaving(false);
     }
@@ -387,7 +387,7 @@ export default function AdminMediaPage() {
           return;
         }
       } else {
-        setMessage(err.message || '批量删除失败');
+        showAppToast(err.message || '批量删除失败');
       }
     } finally {
       setSaving(false);
@@ -411,7 +411,7 @@ export default function AdminMediaPage() {
       showAppToast(data.message || '批量恢复完成');
       await load();
     } catch (err: any) {
-      setMessage(err.message || '批量恢复失败');
+      showAppToast(err.message || '批量恢复失败');
     } finally {
       setSaving(false);
     }
@@ -435,7 +435,7 @@ export default function AdminMediaPage() {
       showAppToast(data.message || '批量彻底删除完成');
       await load();
     } catch (err: any) {
-      setMessage(err.message || '批量彻底删除失败');
+      showAppToast(err.message || '批量彻底删除失败');
     } finally {
       setSaving(false);
     }

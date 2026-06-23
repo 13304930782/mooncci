@@ -14,17 +14,17 @@ export default function AdminSendMailPage() {
     event.preventDefault();
 
     if (!to.trim()) {
-      setMessage('请填写收件人邮箱');
+      showAppToast('请填写收件人邮箱');
       return;
     }
 
     if (!subject.trim()) {
-      setMessage('请填写邮件标题');
+      showAppToast('请填写邮件标题');
       return;
     }
 
     if (!content.trim()) {
-      setMessage('请填写邮件内容');
+      showAppToast('请填写邮件内容');
       return;
     }
 
@@ -41,7 +41,7 @@ export default function AdminSendMailPage() {
       setSubject('');
       setContent('');
     } catch (err: any) {
-      setMessage(err.message || '邮件发送失败');
+      showAppToast(err.message || '邮件发送失败');
     } finally {
       setSending(false);
     }

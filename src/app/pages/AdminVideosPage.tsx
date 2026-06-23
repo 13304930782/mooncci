@@ -231,14 +231,14 @@ export default function AdminVideosPage() {
     setRankingLoading(true);
     api(`/videos/admin/rankings${query.toString() ? `?${query.toString()}` : ''}`)
       .then((rows) => setRankings(Array.isArray(rows) ? rows : []))
-      .catch((err) => setMessage(err.message || '评分排名加载失败'))
+      .catch((err) => showAppToast(err.message || '评分排名加载失败'))
       .finally(() => setRankingLoading(false));
   };
 
   const loadVideos = () => {
     api('/videos/admin')
       .then((rows) => setVideos(Array.isArray(rows) ? rows : []))
-      .catch((err) => setMessage(err.message || '视频加载失败'));
+      .catch((err) => showAppToast(err.message || '视频加载失败'));
   };
 
   useEffect(() => {
@@ -342,7 +342,7 @@ export default function AdminVideosPage() {
       loadVideos();
       loadRankings();
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -359,7 +359,7 @@ export default function AdminVideosPage() {
       loadVideos();
       loadRankings();
     } catch (err: any) {
-      setMessage(err.message || '视频上传失败');
+      showAppToast(err.message || '视频上传失败');
     } finally {
       setUploadingId(null);
     }
@@ -374,7 +374,7 @@ export default function AdminVideosPage() {
       setForm((current) => ({ ...current, cover_image: url }));
       showAppToast('封面已上传，记得保存视频信息');
     } catch (err: any) {
-      setMessage(err.message || '封面上传失败');
+      showAppToast(err.message || '封面上传失败');
     }
   };
 
@@ -388,7 +388,7 @@ export default function AdminVideosPage() {
       loadVideos();
       loadRankings();
     } catch (err: any) {
-      setMessage(err.message || '删除失败');
+      showAppToast(err.message || '删除失败');
     }
   };
 
@@ -398,7 +398,7 @@ export default function AdminVideosPage() {
       const data = await api(`/videos/admin/${video.id}/scores`);
       setScores(Array.isArray(data.scores) ? data.scores : []);
     } catch (err: any) {
-      setMessage(err.message || '评分明细加载失败');
+      showAppToast(err.message || '评分明细加载失败');
     }
   };
 

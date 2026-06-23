@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarDays, Megaphone, Pin } from 'lucide-react';
 import { PageShell } from '../components/layout/PageShell';
 import { api } from '../lib/api';
+import { showAppToast } from '../components/AppToast';
 
 type Announcement = {
   id: number;
@@ -70,7 +71,7 @@ export default function AnnouncementsPage() {
         setItems(Array.isArray(rows) ? rows : []);
       })
       .catch((err) => {
-        setMessage(err?.message || '公告加载失败');
+        showAppToast(err?.message || '公告加载失败');
       })
       .finally(() => setLoading(false));
   }, []);

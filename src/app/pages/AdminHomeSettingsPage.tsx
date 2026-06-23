@@ -148,7 +148,7 @@ export default function AdminHomeSettingsPage() {
         setSettings(next);
         setChipsText(next.hero_chips.join('\n'));
       })
-      .catch((err) => setMessage(err.message || '首页设置加载失败'));
+      .catch((err) => showAppToast(err.message || '首页设置加载失败'));
   }, []);
 
   const update = (key: keyof HomeSettings, value: string) => {
@@ -214,7 +214,7 @@ export default function AdminHomeSettingsPage() {
     try {
       await persistSettings(payload, '首页设置已保存。公开首页刷新后会重新读取 /api/home-settings。');
     } catch (err: any) {
-      setMessage(err.message || '保存失败');
+      showAppToast(err.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -237,7 +237,7 @@ export default function AdminHomeSettingsPage() {
 
       await persistSettings(next, '已导入旧站点设置中的首页 Hero 和个人资料，并保存到新的首页设置。');
     } catch (err: any) {
-      setMessage(err.message || '导入旧首页设置失败');
+      showAppToast(err.message || '导入旧首页设置失败');
     } finally {
       setImportingLegacy(false);
     }

@@ -10,7 +10,7 @@ export default function AdminPostsPage() {
   const loadPosts = () => {
     api('/admin/posts')
       .then(setPosts)
-      .catch((err) => setMessage(err.message || '文章加载失败'));
+      .catch((err) => showAppToast(err.message || '文章加载失败'));
   };
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export default function AdminPostsPage() {
       showAppToast('删除成功');
       loadPosts();
     } catch (err: any) {
-      setMessage(err.message || '删除失败');
+      showAppToast(err.message || '删除失败');
     }
   };
 

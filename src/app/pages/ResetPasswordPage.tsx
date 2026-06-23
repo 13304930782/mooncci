@@ -17,22 +17,22 @@ export default function ResetPasswordPage() {
     event.preventDefault();
 
     if (!token) {
-      setMessage('重置链接缺少 token，请重新申请');
+      showAppToast('重置链接缺少 token，请重新申请');
       return;
     }
 
     if (!password || !confirmPassword) {
-      setMessage('请填写新密码和确认密码');
+      showAppToast('请填写新密码和确认密码');
       return;
     }
 
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      setMessage('新密码至少 8 位，并且需要同时包含字母和数字');
+      showAppToast('新密码至少 8 位，并且需要同时包含字母和数字');
       return;
     }
 
     if (password !== confirmPassword) {
-      setMessage('两次输入的密码不一致');
+      showAppToast('两次输入的密码不一致');
       return;
     }
 
@@ -47,7 +47,7 @@ export default function ResetPasswordPage() {
 
       showAppToast(res.message || '密码已重置，请重新登录');
     } catch (err: any) {
-      setMessage(err.message || '重置失败');
+      showAppToast(err.message || '重置失败');
     } finally {
       setLoading(false);
     }
