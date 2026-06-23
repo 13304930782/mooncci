@@ -843,7 +843,8 @@ async function fetchRankingRows(user, filters = {}) {
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code);
+  const videoClassCode = cleanClassCode(filters.video_class_code || filters.class_code);
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code) || videoClassCode;
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
@@ -874,7 +875,8 @@ async function fetchScoreRecordRows(user, filters = {}) {
   if (!videoIds.length) return [];
 
   const videoById = new Map(videos.map((video) => [Number(video.id), video]));
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code);
+  const videoClassCode = cleanClassCode(filters.video_class_code || filters.class_code);
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code) || videoClassCode;
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 

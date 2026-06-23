@@ -206,7 +206,6 @@ export default function AdminVideosPage() {
   const [rankings, setRankings] = useState<RankingRow[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingVideoClass, setRankingVideoClass] = useState('');
-  const [rankingScorerClass, setRankingScorerClass] = useState('');
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
   const manager = user?.role === 'owner' || user?.role === 'admin';
@@ -215,9 +214,8 @@ export default function AdminVideosPage() {
     if (!rankingVideoClass) return '#';
     const query = new URLSearchParams();
     if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
-    if (rankingScorerClass) query.set('scorer_class_code', rankingScorerClass);
     return `/api/videos/admin/rankings/export${query.toString() ? `?${query.toString()}` : ''}`;
-  }, [rankingVideoClass, rankingScorerClass]);
+  }, [rankingVideoClass]);
 
   const loadRankings = () => {
     if (!manager) return;
@@ -229,7 +227,6 @@ export default function AdminVideosPage() {
 
     const query = new URLSearchParams();
     if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
-    if (rankingScorerClass) query.set('scorer_class_code', rankingScorerClass);
 
     setRankingLoading(true);
     api(`/videos/admin/rankings${query.toString() ? `?${query.toString()}` : ''}`)
@@ -247,7 +244,7 @@ export default function AdminVideosPage() {
   useEffect(() => {
     loadVideos();
     loadRankings();
-  }, [manager, rankingVideoClass, rankingScorerClass]);
+  }, [manager, rankingVideoClass]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -444,16 +441,6 @@ export default function AdminVideosPage() {
                 className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
               >
                 <option value="">请选择班级</option>
-                {videoClassOptions.map((item) => (
-                  <option key={item.code} value={item.code}>{item.label}</option>
-                ))}
-              </select>
-              <select
-                value={rankingScorerClass}
-                onChange={(event) => setRankingScorerClass(event.target.value)}
-                className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
-              >
-                <option value="">全部评分班级</option>
                 {videoClassOptions.map((item) => (
                   <option key={item.code} value={item.code}>{item.label}</option>
                 ))}
