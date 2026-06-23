@@ -41,6 +41,11 @@ type ScoreRow = {
   username: string;
   scorer_class_code?: string;
   scorer_group_name?: string;
+  scorer_ip?: string;
+  self_score?: number;
+  project_score?: number;
+  answer_score?: number;
+  max_score?: number;
   content_score: number;
   delivery_score: number;
   technical_score: number;
@@ -109,7 +114,7 @@ const emptyForm: FormState = {
   sort_order: 0,
 };
 
-function formatScore(value?: number | null, suffix = ' / 40') {
+function formatScore(value?: number | null, suffix = ' / 50') {
   if (value == null) return '暂无';
   return `${Number(value).toFixed(1)}${suffix}`;
 }
@@ -423,7 +428,7 @@ export default function AdminVideosPage() {
               </div>
               <h2 className="mt-3 text-xl font-black text-gray-900">按每个视频的全班评分统计最佳分数</h2>
               <p className="mt-1 text-sm leading-6 text-gray-500">
-                最终排名分 = 内容 30% + 技术 30% + 表达 20% + 答辩 20%；5 人及以上自动去掉一个最高和一个最低，再加入极小的人数、稳定度和维度拆分权重，避免同分挤在一起。
+                新评分表满分 50 分：自述 5 分、项目分析设计与实现 35 分、回答问题 10 分；旧评分会自动归一化参与排名。
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -473,12 +478,11 @@ export default function AdminVideosPage() {
                   <th className="py-3 pr-4">视频</th>
                   <th className="py-3 pr-4">评分人数</th>
                   <th className="py-3 pr-4">最终排名分</th>
-                  <th className="py-3 pr-4">加权均分</th>
+                  <th className="py-3 pr-4">归一化均分</th>
                   <th className="py-3 pr-4">去极值均分</th>
-                  <th className="py-3 pr-4">技术</th>
-                  <th className="py-3 pr-4">内容</th>
-                  <th className="py-3 pr-4">表达</th>
-                  <th className="py-3 pr-4">答辩</th>
+                  <th className="py-3 pr-4">自述</th>
+                  <th className="py-3 pr-4">项目</th>
+                  <th className="py-3 pr-4">回答</th>
                 </tr>
               </thead>
               <tbody>
@@ -493,15 +497,14 @@ export default function AdminVideosPage() {
                     <td className="py-3 pr-4 font-black text-blue-700">{formatFinalScore(row.final_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.weighted_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.trimmed_weighted_score)}</td>
-                    <td className="py-3 pr-4">{formatFinalScore(row.avg_technical_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_content_score)}</td>
-                    <td className="py-3 pr-4">{formatFinalScore(row.avg_delivery_score)}</td>
+                    <td className="py-3 pr-4">{formatFinalScore(row.avg_technical_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_defense_score)}</td>
                   </tr>
                 ))}
                 {rankings.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
+                    <td colSpan={9} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
                   </tr>
                 )}
               </tbody>
@@ -737,10 +740,9 @@ export default function AdminVideosPage() {
                     <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-600">
                       <span>综合均分：{formatScore(video.avg_total_score)}</span>
                       <span>评分人数：{video.score_count}</span>
-                      <span>内容：{formatScore(video.avg_content_score, ' / 10')}</span>
-                      <span>表达：{formatScore(video.avg_delivery_score, ' / 10')}</span>
-                      <span>技术：{formatScore(video.avg_technical_score, ' / 10')}</span>
-                      <span>答辩：{formatScore(video.avg_defense_score, ' / 10')}</span>
+                      <span>自述：{formatScore(video.avg_content_score, ' / 5')}</span>
+                      <span>项目：{formatScore(video.avg_technical_score, ' / 35')}</span>
+                      <span>回答：{formatScore(video.avg_defense_score, ' / 10')}</span>
                     </div>
                   </div>
 
@@ -803,10 +805,11 @@ export default function AdminVideosPage() {
                   <th className="py-3 pr-4">评分班级</th>
                   <th className="py-3 pr-4">评分小组</th>
                   <th className="py-3 pr-4">总分</th>
-                  <th className="py-3 pr-4">内容</th>
-                  <th className="py-3 pr-4">表达</th>
-                  <th className="py-3 pr-4">技术</th>
-                  <th className="py-3 pr-4">答辩</th>
+                  <th className="py-3 pr-4">自述</th>
+                  <th className="py-3 pr-4">项目</th>
+                  <th className="py-3 pr-4">回答</th>
+                  <th className="py-3 pr-4">IP</th>
+                  <th className="py-3 pr-4">时间</th>
                   <th className="py-3 pr-4">点评</th>
                 </tr>
               </thead>
@@ -816,17 +819,18 @@ export default function AdminVideosPage() {
                     <td className="py-3 pr-4 font-semibold text-gray-900">{score.username}</td>
                     <td className="py-3 pr-4">{getVideoClassLabel(score.scorer_class_code) || '-'}</td>
                     <td className="py-3 pr-4">{score.scorer_group_name || '-'}</td>
-                    <td className="py-3 pr-4 font-bold text-blue-700">{score.total_score}</td>
-                    <td className="py-3 pr-4">{score.content_score}</td>
-                    <td className="py-3 pr-4">{score.delivery_score}</td>
-                    <td className="py-3 pr-4">{score.technical_score}</td>
-                    <td className="py-3 pr-4">{score.defense_score}</td>
+                    <td className="py-3 pr-4 font-bold text-blue-700">{score.total_score} / {score.max_score || 50}</td>
+                    <td className="py-3 pr-4">{score.self_score ?? score.content_score}</td>
+                    <td className="py-3 pr-4">{score.project_score ?? score.technical_score}</td>
+                    <td className="py-3 pr-4">{score.answer_score ?? score.defense_score}</td>
+                    <td className="py-3 pr-4">{score.scorer_ip || '-'}</td>
+                    <td className="py-3 pr-4">{score.updated_at ? new Date(score.updated_at).toLocaleString('zh-CN', { hour12: false }) : '-'}</td>
                     <td className="max-w-md py-3 pr-4 text-gray-600">{score.comment || '-'}</td>
                   </tr>
                 ))}
                 {scores.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-6 text-center text-gray-500">暂无评分</td>
+                    <td colSpan={10} className="py-6 text-center text-gray-500">暂无评分</td>
                   </tr>
                 )}
               </tbody>

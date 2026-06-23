@@ -26,7 +26,7 @@ type VideoItem = {
 
 function formatScore(value?: number | null) {
   if (value == null) return '暂无';
-  return `${Number(value).toFixed(1)} / 40`;
+  return `${Number(value).toFixed(1)} / 50`;
 }
 
 function getSourceLabel(video: VideoItem) {
@@ -98,7 +98,7 @@ export default function VideosPage() {
               答辩视频点评
             </h1>
             <p className="mt-4 text-sm leading-8 text-slate-600 dark:text-slate-300">
-              集中观看班级答辩视频，按内容完整度、表达展示、技术实现、答辩表现四个维度评分，并汇总统计结果。
+              集中观看班级答辩视频，按自述、项目分析设计与实现、回答问题三部分共 50 分评分，并汇总统计结果。
             </p>
           </div>
         </section>

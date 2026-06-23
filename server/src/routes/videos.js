@@ -36,6 +36,23 @@ const classOptions = [
 ];
 const classCodes = new Set(classOptions.map((item) => item.code));
 
+const detailedScoreFields = [
+  { key: 'presentation_appearance_score', max: 1 },
+  { key: 'presentation_language_score', max: 2 },
+  { key: 'presentation_timing_score', max: 2 },
+  { key: 'principle_analysis_score', max: 5 },
+  { key: 'code_analysis_score', max: 5 },
+  { key: 'algorithm_design_score', max: 6 },
+  { key: 'implementation_score', max: 5 },
+  { key: 'logic_quality_score', max: 5 },
+  { key: 'ui_design_score', max: 5 },
+  { key: 'extra_feature_score', max: 4 },
+  { key: 'answer_clarity_score', max: 4 },
+  { key: 'knowledge_score', max: 6 },
+];
+
+const detailedScoreKeys = detailedScoreFields.map((item) => item.key);
+
 function cleanString(value, max = 500) {
   return String(value || '').trim().slice(0, max);
 }
@@ -92,6 +109,77 @@ function clampScore(value) {
   const score = Number(value);
   if (!Number.isInteger(score) || score < 1 || score > 10) return null;
   return score;
+}
+
+function clampScoreRange(value, max) {
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0 || score > max) return null;
+  return score;
+}
+
+function parseDetailedScores(body) {
+  const scores = {};
+
+  for (const field of detailedScoreFields) {
+    const score = clampScoreRange(body[field.key], field.max);
+    if (score == null) return null;
+    scores[field.key] = score;
+  }
+
+  return scores;
+}
+
+function hasDetailedScore(row) {
+  return row && row.presentation_appearance_score != null;
+}
+
+function sumDetailedScores(row, keys) {
+  return keys.reduce((sum, key) => sum + Number(row[key] || 0), 0);
+}
+
+function scoreParts(row) {
+  if (hasDetailedScore(row)) {
+    return {
+      self: sumDetailedScores(row, ['presentation_appearance_score', 'presentation_language_score', 'presentation_timing_score']),
+      project: sumDetailedScores(row, ['principle_analysis_score', 'code_analysis_score', 'algorithm_design_score', 'implementation_score', 'logic_quality_score', 'ui_design_score', 'extra_feature_score']),
+      answer: sumDetailedScores(row, ['answer_clarity_score', 'knowledge_score']),
+      total: sumDetailedScores(row, detailedScoreKeys),
+      max: 50,
+    };
+  }
+
+  return {
+    self: Number(row.content_score || 0),
+    project: Number(row.technical_score || 0) + Number(row.delivery_score || 0),
+    answer: Number(row.defense_score || 0),
+    total: Number(row.content_score || 0) + Number(row.delivery_score || 0) + Number(row.technical_score || 0) + Number(row.defense_score || 0),
+    max: 40,
+  };
+}
+
+function scoreTotal(row) {
+  return scoreParts(row).total;
+}
+
+function normalizedScore(row) {
+  const parts = scoreParts(row);
+  return parts.max > 0 ? (parts.total / parts.max) * 100 : 0;
+}
+
+function requestIp(req) {
+  return cleanString(String(req.headers['x-forwarded-for'] || '').split(',')[0] || req.ip || req.socket?.remoteAddress || '', 64);
+}
+
+function mapScoreRow(row) {
+  const parts = scoreParts(row);
+  return {
+    ...row,
+    total_score: parts.total,
+    max_score: parts.max,
+    self_score: parts.self,
+    project_score: parts.project,
+    answer_score: parts.answer,
+  };
 }
 
 function safeBasename(filename) {
@@ -171,6 +259,35 @@ async function ensurePublicScoringSchemaOnce() {
 
   if (!(await columnExists('video_scores', 'scorer_group_name'))) {
     await db.query('ALTER TABLE video_scores ADD COLUMN scorer_group_name VARCHAR(100) NULL AFTER scorer_class_code');
+  }
+
+  if (!(await columnExists('video_scores', 'scorer_ip'))) {
+    await db.query('ALTER TABLE video_scores ADD COLUMN scorer_ip VARCHAR(64) NULL AFTER scorer_group_name');
+  }
+
+  if (!(await columnExists('video_scores', 'scorer_user_agent'))) {
+    await db.query('ALTER TABLE video_scores ADD COLUMN scorer_user_agent VARCHAR(255) NULL AFTER scorer_ip');
+  }
+
+  const previousColumn = {
+    presentation_appearance_score: 'comment',
+    presentation_language_score: 'presentation_appearance_score',
+    presentation_timing_score: 'presentation_language_score',
+    principle_analysis_score: 'presentation_timing_score',
+    code_analysis_score: 'principle_analysis_score',
+    algorithm_design_score: 'code_analysis_score',
+    implementation_score: 'algorithm_design_score',
+    logic_quality_score: 'implementation_score',
+    ui_design_score: 'logic_quality_score',
+    extra_feature_score: 'ui_design_score',
+    answer_clarity_score: 'extra_feature_score',
+    knowledge_score: 'answer_clarity_score',
+  };
+
+  for (const field of detailedScoreFields) {
+    if (!(await columnExists('video_scores', field.key))) {
+      await db.query(`ALTER TABLE video_scores ADD COLUMN ${field.key} TINYINT NULL AFTER ${previousColumn[field.key]}`);
+    }
   }
 
   await db.query(`
@@ -469,6 +586,31 @@ const upload = multer({
   },
 });
 
+const detailedTotalSql = detailedScoreKeys.map((key) => `COALESCE(${key}, 0)`).join(' + ');
+const selfScoreSql = ['presentation_appearance_score', 'presentation_language_score', 'presentation_timing_score'].map((key) => `COALESCE(${key}, 0)`).join(' + ');
+const projectScoreSql = ['principle_analysis_score', 'code_analysis_score', 'algorithm_design_score', 'implementation_score', 'logic_quality_score', 'ui_design_score', 'extra_feature_score'].map((key) => `COALESCE(${key}, 0)`).join(' + ');
+const answerScoreSql = ['answer_clarity_score', 'knowledge_score'].map((key) => `COALESCE(${key}, 0)`).join(' + ');
+
+function scoreSqlExpression() {
+  return `CASE
+    WHEN presentation_appearance_score IS NOT NULL THEN ${detailedTotalSql}
+    ELSE content_score + delivery_score + technical_score + defense_score
+  END`;
+}
+
+function categorySqlExpression(category) {
+  if (category === 'self') {
+    return `CASE WHEN presentation_appearance_score IS NOT NULL THEN ${selfScoreSql} ELSE content_score END`;
+  }
+  if (category === 'project') {
+    return `CASE WHEN presentation_appearance_score IS NOT NULL THEN ${projectScoreSql} ELSE technical_score + delivery_score END`;
+  }
+  if (category === 'answer') {
+    return `CASE WHEN presentation_appearance_score IS NOT NULL THEN ${answerScoreSql} ELSE defense_score END`;
+  }
+  return scoreSqlExpression();
+}
+
 function mapVideoRow(row) {
   const allowedClassCodes = String(row.allowed_class_codes || '')
     .split(',')
@@ -519,11 +661,11 @@ function buildVideoSummarySql(whereSql = '') {
       SELECT
         video_id,
         COUNT(id) AS score_count,
-        ROUND(AVG(content_score + delivery_score + technical_score + defense_score), 2) AS avg_total_score,
-        ROUND(AVG(content_score), 2) AS avg_content_score,
-        ROUND(AVG(delivery_score), 2) AS avg_delivery_score,
-        ROUND(AVG(technical_score), 2) AS avg_technical_score,
-        ROUND(AVG(defense_score), 2) AS avg_defense_score
+        ROUND(AVG(${scoreSqlExpression()}), 2) AS avg_total_score,
+        ROUND(AVG(${categorySqlExpression('self')}), 2) AS avg_content_score,
+        NULL AS avg_delivery_score,
+        ROUND(AVG(${categorySqlExpression('project')}), 2) AS avg_technical_score,
+        ROUND(AVG(${categorySqlExpression('answer')}), 2) AS avg_defense_score
       FROM video_scores
       GROUP BY video_id
     ) sc ON sc.video_id = v.id
@@ -584,12 +726,7 @@ function roundNumber(value, digits = 2) {
 }
 
 function weightedScore(row) {
-  return (
-    Number(row.content_score || 0) * scoreWeights.content +
-    Number(row.technical_score || 0) * scoreWeights.technical +
-    Number(row.delivery_score || 0) * scoreWeights.delivery +
-    Number(row.defense_score || 0) * scoreWeights.defense
-  );
+  return normalizedScore(row);
 }
 
 function average(values) {
@@ -625,14 +762,15 @@ function buildRankingRows(videos, scoreRows) {
     const trimmedWeightedAvg = average(effectiveScores);
     const scoreStddev = stddev(weightedScores, weightedAvg);
 
-    const avgContent = average(scores.map((row) => Number(row.content_score || 0)));
-    const avgDelivery = average(scores.map((row) => Number(row.delivery_score || 0)));
-    const avgTechnical = average(scores.map((row) => Number(row.technical_score || 0)));
-    const avgDefense = average(scores.map((row) => Number(row.defense_score || 0)));
+    const scorePartRows = scores.map(scoreParts);
+    const avgContent = average(scorePartRows.map((row) => Number(row.self || 0)));
+    const avgDelivery = null;
+    const avgTechnical = average(scorePartRows.map((row) => Number(row.project || 0)));
+    const avgDefense = average(scorePartRows.map((row) => Number(row.answer || 0)));
 
     // 最终排名分：主体是全班加权均分；人数和稳定度只做小幅校正；最后用维度小权重拆平分。
     // 这样不会因为同分而全挤在一起，也不会让随机 id 影响排名。
-    const baseScore100 = trimmedWeightedAvg == null ? null : trimmedWeightedAvg * 10;
+    const baseScore100 = trimmedWeightedAvg == null ? null : trimmedWeightedAvg;
     const participationBonus = maxScoreCount > 0 ? Math.min(scoreCount / maxScoreCount, 1) * 0.30 : 0;
     const consistencyBonus = scoreStddev == null ? 0 : Math.max(0, 1 - Math.min(scoreStddev / 2.5, 1)) * 0.20;
     const tieBreaker = scoreCount > 0
@@ -748,12 +886,11 @@ function buildRankingCsv(rows) {
     '主讲人',
     '评分人数',
     '最终排名分',
-    '加权均分',
+    '归一化均分',
     '去极值均分',
-    '内容均分',
-    '表达均分',
-    '技术均分',
-    '答辩均分',
+    '自述均分',
+    '项目均分',
+    '回答均分',
     '标准差',
     '人数加成',
     '稳定度加成',
@@ -775,7 +912,6 @@ function buildRankingCsv(rows) {
       row.weighted_score,
       row.trimmed_weighted_score,
       row.avg_content_score,
-      row.avg_delivery_score,
       row.avg_technical_score,
       row.avg_defense_score,
       row.score_stddev,
@@ -787,7 +923,7 @@ function buildRankingCsv(rows) {
   });
 
   lines.push('');
-  lines.push(['权重说明', '内容30% + 技术30% + 表达20% + 答辩20%；5人及以上自动去掉一个最高和一个最低；人数和稳定度仅做小幅校正；维度小权重用于拆分同分。'].map(csvCell).join(','));
+  lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计；旧40分评分会自动归一化参与排名。'].map(csvCell).join(','));
 
   return `\ufeff${lines.join('\n')}`;
 }
@@ -882,8 +1018,7 @@ router.get('/admin/:id/scores', authRequired, adminOnly, async (req, res) => {
       `
       SELECT
         s.*,
-        COALESCE(u.username, s.scorer_name) AS username,
-        (s.content_score + s.delivery_score + s.technical_score + s.defense_score) AS total_score
+        COALESCE(u.username, s.scorer_name) AS username
       FROM video_scores s
       LEFT JOIN users u ON u.id = s.user_id
       WHERE s.video_id=?
@@ -892,7 +1027,7 @@ router.get('/admin/:id/scores', authRequired, adminOnly, async (req, res) => {
       [req.params.id]
     );
 
-    res.json({ video, scores: rows });
+    res.json({ video, scores: rows.map(mapScoreRow) });
   } catch (err) {
     console.error('[videos/admin/scores]', err);
     res.status(500).json({ message: '评分明细加载失败' });
@@ -913,7 +1048,7 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/my-score', authRequired, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM video_scores WHERE video_id=? AND user_id=? LIMIT 1', [req.params.id, req.user.id]);
-    res.json(rows[0] || null);
+    res.json(rows[0] ? mapScoreRow(rows[0]) : null);
   } catch (err) {
     console.error('[videos/my-score]', err);
     res.status(500).json({ message: '评分加载失败' });
@@ -1088,28 +1223,47 @@ router.post('/:id/score', authRequired, async (req, res) => {
     const video = await fetchVideo(req.params.id, false);
     if (!video) return res.status(404).json({ message: '视频不存在或尚未发布' });
 
-    const scores = {
-      content: clampScore(req.body.content_score),
-      delivery: clampScore(req.body.delivery_score),
-      technical: clampScore(req.body.technical_score),
-      defense: clampScore(req.body.defense_score),
-    };
+    const detailedScores = parseDetailedScores(req.body);
+    let scores;
 
-    if (Object.values(scores).some((score) => score == null)) {
-      return res.status(400).json({ message: '每个维度都需要 1-10 分' });
+    if (detailedScores) {
+      const parts = scoreParts(detailedScores);
+      scores = {
+        content: parts.self,
+        delivery: 0,
+        technical: parts.project,
+        defense: parts.answer,
+      };
+    } else {
+      scores = {
+        content: clampScore(req.body.content_score),
+        delivery: clampScore(req.body.delivery_score),
+        technical: clampScore(req.body.technical_score),
+        defense: clampScore(req.body.defense_score),
+      };
+
+      if (Object.values(scores).some((score) => score == null)) {
+        return res.status(400).json({ message: '请按评分表填写所有细项分数' });
+      }
     }
+
+    const detailedColumns = detailedScoreKeys.join(', ');
+    const detailedPlaceholders = detailedScoreKeys.map(() => '?').join(', ');
+    const detailedUpdates = detailedScoreKeys.map((key) => `${key}=VALUES(${key})`).join(',\n        ');
+    const detailedValues = detailedScores ? detailedScoreKeys.map((key) => detailedScores[key]) : detailedScoreKeys.map(() => null);
 
     await db.query(
       `
       INSERT INTO video_scores
-      (video_id, user_id, content_score, delivery_score, technical_score, defense_score, comment)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      (video_id, user_id, content_score, delivery_score, technical_score, defense_score, comment, ${detailedColumns})
+      VALUES (?, ?, ?, ?, ?, ?, ?, ${detailedPlaceholders})
       ON DUPLICATE KEY UPDATE
         content_score=VALUES(content_score),
         delivery_score=VALUES(delivery_score),
         technical_score=VALUES(technical_score),
         defense_score=VALUES(defense_score),
         comment=VALUES(comment),
+        ${detailedUpdates},
         updated_at=CURRENT_TIMESTAMP
       `,
       [
@@ -1120,6 +1274,7 @@ router.post('/:id/score', authRequired, async (req, res) => {
         scores.technical,
         scores.defense,
         cleanString(req.body.comment, 2000),
+        ...detailedValues,
       ]
     );
 
@@ -1130,87 +1285,140 @@ router.post('/:id/score', authRequired, async (req, res) => {
   }
 });
 
+async function validatePublicScoreRequest(req, video) {
+  if (!video) return { error: { status: 404, message: '视频不存在或尚未发布' } };
+  if (Number(video.public_scoring_enabled) !== 1) {
+    return { error: { status: 403, message: '该视频未开启免登录评分' } };
+  }
+
+  const scorerName = cleanScorerName(req.body.scorer_name || req.query.scorer_name);
+  if (!scorerName) {
+    return { error: { status: 400, message: '姓名不能为空' } };
+  }
+
+  const scorerClassCode = cleanClassCode(req.body.scorer_class_code || req.body.scorerClassCode || req.query.scorer_class_code || req.query.scorerClassCode);
+  if (!scorerClassCode) {
+    return { error: { status: 400, message: '请选择你的班级' } };
+  }
+
+  const scorerGroupName = cleanGroupName(req.body.scorer_group_name || req.body.scorerGroupName || req.query.scorer_group_name || req.query.scorerGroupName);
+  if (!scorerGroupName) {
+    return { error: { status: 400, message: '请填写你的小组' } };
+  }
+
+  if (!(await classCanScoreVideo(req.params.id, scorerClassCode))) {
+    return { error: { status: 403, message: '当前班级不允许给这个视频评分' } };
+  }
+
+  if (
+    cleanClassCode(video.class_code) &&
+    cleanClassCode(video.class_code) === scorerClassCode &&
+    normalizeGroupName(video.team_name) &&
+    normalizeGroupName(video.team_name) === normalizeGroupName(scorerGroupName)
+  ) {
+    return { error: { status: 403, message: '不能给自己小组的视频打分' } };
+  }
+
+  return { scorerName, scorerClassCode, scorerGroupName };
+}
+
+router.get('/:id/public-score-status', async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, false);
+    const checked = await validatePublicScoreRequest(req, video);
+    if (checked.error) {
+      return res.status(checked.error.status).json({ message: checked.error.message });
+    }
+
+    const [rows] = await db.query(
+      'SELECT * FROM video_scores WHERE video_id=? AND scorer_class_code=? AND scorer_name=? LIMIT 1',
+      [req.params.id, checked.scorerClassCode, checked.scorerName]
+    );
+
+    if (!rows[0]) {
+      return res.json({
+        exists: false,
+        message: '暂无评分记录，可以填写新评分。',
+        score: null,
+      });
+    }
+
+    res.json({
+      exists: true,
+      message: '已找到你上次提交的评分，可直接修改后替换。',
+      score: mapScoreRow(rows[0]),
+    });
+  } catch (err) {
+    console.error('[videos/public-score-status]', err);
+    res.status(500).json({ message: '评分记录查询失败' });
+  }
+});
+
 router.post('/:id/public-score', async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, false);
-    if (!video) return res.status(404).json({ message: '视频不存在或尚未发布' });
-    if (Number(video.public_scoring_enabled) !== 1) {
-      return res.status(403).json({ message: '该视频未开启免登录评分' });
+    const checked = await validatePublicScoreRequest(req, video);
+    if (checked.error) {
+      return res.status(checked.error.status).json({ message: checked.error.message });
     }
 
-    const scorerName = cleanScorerName(req.body.scorer_name);
-    if (!scorerName) {
-      return res.status(400).json({ message: '姓名不能为空' });
+    const detailedScores = parseDetailedScores(req.body);
+    if (!detailedScores) {
+      return res.status(400).json({ message: '请按评分表填写所有细项分数' });
     }
 
-    const scorerClassCode = cleanClassCode(req.body.scorer_class_code || req.body.scorerClassCode);
-    if (!scorerClassCode) {
-      return res.status(400).json({ message: '请选择你的班级' });
-    }
-
-    const scorerGroupName = cleanGroupName(req.body.scorer_group_name || req.body.scorerGroupName);
-    if (!scorerGroupName) {
-      return res.status(400).json({ message: '请填写你的小组' });
-    }
-
-    if (!(await classCanScoreVideo(req.params.id, scorerClassCode))) {
-      return res.status(403).json({ message: '当前班级不允许给这个视频评分' });
-    }
-
-    if (
-      cleanClassCode(video.class_code) &&
-      cleanClassCode(video.class_code) === scorerClassCode &&
-      normalizeGroupName(video.team_name) &&
-      normalizeGroupName(video.team_name) === normalizeGroupName(scorerGroupName)
-    ) {
-      return res.status(403).json({ message: '不能给自己小组的视频打分' });
-    }
-
-    const scores = {
-      content: clampScore(req.body.content_score),
-      delivery: clampScore(req.body.delivery_score),
-      technical: clampScore(req.body.technical_score),
-      defense: clampScore(req.body.defense_score),
-    };
-
-    if (Object.values(scores).some((score) => score == null)) {
-      return res.status(400).json({ message: '每个维度都需要 1-10 分' });
-    }
-
-    const [existingRows] = await db.query(
-      'SELECT id FROM video_scores WHERE video_id=? AND scorer_class_code=? AND scorer_name=? LIMIT 1',
-      [req.params.id, scorerClassCode, scorerName]
-    );
-
-    if (existingRows[0]) {
-      return res.status(409).json({ message: '这个班级里的这个名字已经给该视频打过分' });
-    }
+    const parts = scoreParts(detailedScores);
+    const ip = requestIp(req);
+    const userAgent = cleanString(req.headers['user-agent'], 255);
+    const detailedColumns = detailedScoreKeys.join(', ');
+    const detailedPlaceholders = detailedScoreKeys.map(() => '?').join(', ');
+    const detailedUpdates = detailedScoreKeys.map((key) => `${key}=VALUES(${key})`).join(',\n        ');
+    const detailedValues = detailedScoreKeys.map((key) => detailedScores[key]);
 
     await db.query(
       `
       INSERT INTO video_scores
-      (video_id, user_id, scorer_name, scorer_class_code, scorer_group_name, content_score, delivery_score, technical_score, defense_score, comment)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+      (video_id, user_id, scorer_name, scorer_class_code, scorer_group_name, scorer_ip, scorer_user_agent, content_score, delivery_score, technical_score, defense_score, comment, ${detailedColumns})
+      VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${detailedPlaceholders})
+      ON DUPLICATE KEY UPDATE
+        scorer_group_name=VALUES(scorer_group_name),
+        scorer_ip=VALUES(scorer_ip),
+        scorer_user_agent=VALUES(scorer_user_agent),
+        content_score=VALUES(content_score),
+        delivery_score=VALUES(delivery_score),
+        technical_score=VALUES(technical_score),
+        defense_score=VALUES(defense_score),
+        comment=VALUES(comment),
+        ${detailedUpdates},
+        updated_at=CURRENT_TIMESTAMP
       `,
       [
         req.params.id,
-        scorerName,
-        scorerClassCode,
-        scorerGroupName,
-        scores.content,
-        scores.delivery,
-        scores.technical,
-        scores.defense,
+        checked.scorerName,
+        checked.scorerClassCode,
+        checked.scorerGroupName,
+        ip,
+        userAgent,
+        parts.self,
+        0,
+        parts.project,
+        parts.answer,
         cleanString(req.body.comment, 2000),
+        ...detailedValues,
       ]
     );
 
-    res.json({ message: '评分已提交，感谢参与。', video: await fetchVideo(req.params.id, false) });
-  } catch (err) {
-    if (err?.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ message: '这个班级里的这个名字已经给该视频打过分' });
-    }
+    const [rows] = await db.query(
+      'SELECT * FROM video_scores WHERE video_id=? AND scorer_class_code=? AND scorer_name=? LIMIT 1',
+      [req.params.id, checked.scorerClassCode, checked.scorerName]
+    );
 
+    res.json({
+      message: '评分已保存，感谢参与。',
+      video: await fetchVideo(req.params.id, false),
+      score: rows[0] ? mapScoreRow(rows[0]) : null,
+    });
+  } catch (err) {
     console.error('[videos/public-score]', err);
     res.status(500).json({ message: '评分提交失败' });
   }
