@@ -1047,6 +1047,11 @@ router.get('/', async (req, res) => {
 
 router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
   try {
+    if (!cleanClassCode(req.query.video_class_code || req.query.class_code)) {
+      res.json([]);
+      return;
+    }
+
     res.json(await fetchRankingRows(req.user, req.query));
   } catch (err) {
     console.error('[videos/admin/rankings]', err);
@@ -1056,7 +1061,9 @@ router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
 
 router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) => {
   try {
-    const rows = await fetchScoreRecordRows(req.user, req.query);
+    const rows = cleanClassCode(req.query.video_class_code || req.query.class_code)
+      ? await fetchScoreRecordRows(req.user, req.query)
+      : [];
     const csv = buildScoreRecordCsv(rows);
     const filename = `video-score-records-${new Date().toISOString().slice(0, 10)}.csv`;
 

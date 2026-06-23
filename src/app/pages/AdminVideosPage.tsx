@@ -210,7 +210,9 @@ export default function AdminVideosPage() {
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
   const manager = user?.role === 'owner' || user?.role === 'admin';
+  const rankingClassSelected = Boolean(rankingVideoClass);
   const rankingExportUrl = useMemo(() => {
+    if (!rankingVideoClass) return '#';
     const query = new URLSearchParams();
     if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
     if (rankingScorerClass) query.set('scorer_class_code', rankingScorerClass);
@@ -219,6 +221,11 @@ export default function AdminVideosPage() {
 
   const loadRankings = () => {
     if (!manager) return;
+    if (!rankingVideoClass) {
+      setRankings([]);
+      setRankingLoading(false);
+      return;
+    }
 
     const query = new URLSearchParams();
     if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
@@ -436,7 +443,7 @@ export default function AdminVideosPage() {
                 onChange={(event) => setRankingVideoClass(event.target.value)}
                 className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
               >
-                <option value="">全部视频班级</option>
+                <option value="">请选择班级</option>
                 {videoClassOptions.map((item) => (
                   <option key={item.code} value={item.code}>{item.label}</option>
                 ))}
@@ -461,7 +468,15 @@ export default function AdminVideosPage() {
               </button>
               <a
                 href={rankingExportUrl}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                onClick={(event) => {
+                  if (!rankingClassSelected) event.preventDefault();
+                }}
+                aria-disabled={!rankingClassSelected}
+                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold ${
+                  rankingClassSelected
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'cursor-not-allowed bg-gray-100 text-gray-400'
+                }`}
               >
                 <Download className="h-4 w-4" />
                 导出评分记录表
@@ -499,7 +514,12 @@ export default function AdminVideosPage() {
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_defense_score)}</td>
                   </tr>
                 ))}
-                {rankings.length === 0 && (
+                {!rankingClassSelected && (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-gray-500">请选择班级后查看排名和导出评分记录表。</td>
+                  </tr>
+                )}
+                {rankingClassSelected && rankings.length === 0 && (
                   <tr>
                     <td colSpan={8} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
                   </tr>
