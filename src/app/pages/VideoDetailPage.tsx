@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { BarChart3, CheckCircle2, LogIn, Star } from 'lucide-react';
+import { BarChart3, CheckCircle2, Star } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
@@ -432,13 +432,9 @@ export default function VideoDetailPage() {
                   我的评分
                 </div>
 
-                {!publicScoringEnabled && !user ? (
-                  <div className="mt-4 rounded-lg bg-slate-100 p-4 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    登录后可以评分和填写点评。
-                    <Link to={`/login?redirect=/videos/${id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">
-                      <LogIn className="h-4 w-4" />
-                      去登录
-                    </Link>
+                {!publicScoringEnabled ? (
+                  <div className="mt-4 rounded-lg bg-slate-100 p-4 text-sm leading-6 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    当前视频评分暂未开放或已停止，请等待老师开放后再提交评分。
                   </div>
                 ) : (
                   <div className="mt-4 space-y-4">
@@ -532,7 +528,7 @@ export default function VideoDetailPage() {
           </div>
         )}
 
-        {video && (!publicScoringEnabled || identityChecked) && (!publicScoringEnabled ? Boolean(user) : true) && (
+        {video && publicScoringEnabled && identityChecked && (
           <section className="mt-6 rounded-xl border border-slate-200/70 bg-white/90 p-5 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/90">
             <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
               <div>
