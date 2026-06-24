@@ -549,7 +549,7 @@ export default function AdminVideosPage() {
                 <RefreshCw className="h-4 w-4" />
                 {rankingLoading ? '刷新中...' : '刷新数据'}
               </button>
-              {canManageVideos && (
+              {canReviewVideos && (
                 <>
                   <button
                     type="button"

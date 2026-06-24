@@ -1104,7 +1104,7 @@ router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req
   }
 });
 
-router.post('/admin/class-scoring', authRequired, editorOrAdmin, async (req, res) => {
+router.post('/admin/class-scoring', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
     if (!classCode) return res.status(400).json({ message: '请选择班级' });
