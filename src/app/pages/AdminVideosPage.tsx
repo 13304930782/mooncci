@@ -206,6 +206,7 @@ export default function AdminVideosPage() {
   const [rankings, setRankings] = useState<RankingRow[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingVideoClass, setRankingVideoClass] = useState('');
+  const [videoListClass, setVideoListClass] = useState('');
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
   const role = user?.role || 'user';
@@ -239,7 +240,10 @@ export default function AdminVideosPage() {
   };
 
   const loadVideos = () => {
-    api('/videos/admin')
+    const query = new URLSearchParams();
+    if (videoListClass) query.set('class_code', videoListClass);
+
+    api(`/videos/admin${query.toString() ? `?${query.toString()}` : ''}`)
       .then((rows) => setVideos(Array.isArray(rows) ? rows : []))
       .catch((err) => showAppToast(err.message || '视频加载失败'));
   };
@@ -247,7 +251,7 @@ export default function AdminVideosPage() {
   useEffect(() => {
     loadVideos();
     loadRankings();
-  }, [canReviewVideos, rankingVideoClass]);
+  }, [canReviewVideos, rankingVideoClass, videoListClass]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => {
@@ -715,13 +719,25 @@ export default function AdminVideosPage() {
               <h2 className="text-xl font-bold text-gray-900">视频列表</h2>
               <p className="mt-1 text-sm text-gray-500">发布后前台可见；大视频优先使用外部直链或第三方嵌入。</p>
             </div>
-            <Link to="/videos" className="rounded-2xl bg-gray-950 px-4 py-2 text-sm font-bold text-white">
-              查看前台栏目
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={videoListClass}
+                onChange={(event) => setVideoListClass(event.target.value)}
+                className="rounded-2xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 outline-none hover:bg-gray-50"
+              >
+                <option value="">全部班级</option>
+                {videoClassOptions.map((item) => (
+                  <option key={item.code} value={item.code}>{item.label}</option>
+                ))}
+              </select>
+              <Link to="/videos" className="rounded-2xl bg-gray-950 px-4 py-2 text-sm font-bold text-white">
+                查看前台栏目
+              </Link>
+            </div>
           </div>
 
           <div className="mt-6 space-y-4">
-            {videos.length === 0 && <p className="text-sm text-gray-500">还没有视频，先从左侧创建一个。</p>}
+            {videos.length === 0 && <p className="text-sm text-gray-500">{videoListClass ? '当前班级还没有视频。' : '还没有视频，先从左侧创建一个。'}</p>}
 
             {videos.map((video) => (
               <div key={video.id} className="rounded-2xl border border-gray-200 bg-white p-4">

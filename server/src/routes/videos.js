@@ -1111,7 +1111,7 @@ router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req
 
 router.get('/admin', authRequired, videoReviewerOnly, async (req, res) => {
   try {
-    res.json(await fetchAdminVideos(req.user));
+    res.json(await fetchAdminVideos(req.user, req.query));
   } catch (err) {
     console.error('[videos/admin/list]', err);
     res.status(500).json({ message: '后台视频列表加载失败' });
