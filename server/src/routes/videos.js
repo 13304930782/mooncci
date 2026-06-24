@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const FileType = require('file-type');
 const db = require('../db');
-const { authRequired, adminOnly, editorOrAdmin, videoReviewerOnly, isAdminLike } = require('../middleware/auth');
+const { authRequired, adminOnly, editorOrAdmin, videoReviewerOnly, isAdminLike, isVideoReviewerLike } = require('../middleware/auth');
 
 const router = express.Router();
 const videoDir = path.join(__dirname, '../../uploads/videos');
@@ -816,7 +816,7 @@ async function fetchAdminVideos(user, filters = {}) {
   const where = [];
   const params = [];
 
-  if (!isAdminLike(user)) {
+  if (!isAdminLike(user) && !isVideoReviewerLike(user)) {
     where.push('v.created_by=?');
     params.push(user.id);
   }
@@ -839,12 +839,11 @@ async function fetchAdminVideos(user, filters = {}) {
 }
 
 async function fetchRankingRows(user, filters = {}) {
-  const videos = await fetchAdminVideos(user, filters);
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
+  const videos = await fetchAdminVideos(user, scorerClassCode ? {} : filters);
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
-  const videoClassCode = cleanClassCode(filters.video_class_code || filters.class_code);
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code) || videoClassCode;
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
@@ -866,17 +865,16 @@ async function fetchRankingRows(user, filters = {}) {
     params
   );
 
-  return buildRankingRows(videos, scoreRows);
+  return buildRankingRows(videos, scoreRows).filter((row) => row.score_count > 0);
 }
 
 async function fetchScoreRecordRows(user, filters = {}) {
-  const videos = await fetchAdminVideos(user, filters);
+  const scorerClassCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
+  const videos = await fetchAdminVideos(user, scorerClassCode ? {} : filters);
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
   const videoById = new Map(videos.map((video) => [Number(video.id), video]));
-  const videoClassCode = cleanClassCode(filters.video_class_code || filters.class_code);
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code) || videoClassCode;
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
@@ -1049,7 +1047,7 @@ router.get('/', async (req, res) => {
 
 router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) => {
   try {
-    if (!cleanClassCode(req.query.video_class_code || req.query.class_code)) {
+    if (!cleanClassCode(req.query.scorer_class_code || req.query.video_class_code || req.query.class_code)) {
       res.json([]);
       return;
     }
@@ -1063,7 +1061,7 @@ router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) 
 
 router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req, res) => {
   try {
-    const rows = cleanClassCode(req.query.video_class_code || req.query.class_code)
+    const rows = cleanClassCode(req.query.scorer_class_code || req.query.video_class_code || req.query.class_code)
       ? await fetchScoreRecordRows(req.user, req.query)
       : [];
     const csv = buildScoreRecordCsv(rows);

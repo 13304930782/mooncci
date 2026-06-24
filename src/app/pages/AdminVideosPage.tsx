@@ -216,7 +216,7 @@ export default function AdminVideosPage() {
   const rankingExportUrl = useMemo(() => {
     if (!rankingVideoClass) return '#';
     const query = new URLSearchParams();
-    if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
+    if (rankingVideoClass) query.set('scorer_class_code', rankingVideoClass);
     return `/api/videos/admin/rankings/export${query.toString() ? `?${query.toString()}` : ''}`;
   }, [rankingVideoClass]);
 
@@ -229,7 +229,7 @@ export default function AdminVideosPage() {
     }
 
     const query = new URLSearchParams();
-    if (rankingVideoClass) query.set('video_class_code', rankingVideoClass);
+    if (rankingVideoClass) query.set('scorer_class_code', rankingVideoClass);
 
     setRankingLoading(true);
     api(`/videos/admin/rankings${query.toString() ? `?${query.toString()}` : ''}`)
