@@ -214,6 +214,7 @@ CREATE TABLE `videos` (
   `title` varchar(255) NOT NULL,
   `summary` text,
   `team_name` varchar(120) DEFAULT NULL,
+  `class_code` varchar(40) NOT NULL DEFAULT '',
   `speaker_names` varchar(255) DEFAULT NULL,
   `source_type` varchar(20) NOT NULL DEFAULT 'local',
   `video_url` varchar(500) DEFAULT NULL,
@@ -223,6 +224,7 @@ CREATE TABLE `videos` (
   `video_mime` varchar(100) DEFAULT NULL,
   `video_size` bigint(20) unsigned DEFAULT NULL,
   `cover_image` varchar(500) DEFAULT NULL,
+  `public_scoring_enabled` tinyint(4) NOT NULL DEFAULT '0',
   `status` enum('draft','published') NOT NULL DEFAULT 'draft',
   `sort_order` int(11) NOT NULL DEFAULT '0',
   `created_by` int(11) DEFAULT NULL,
@@ -242,19 +244,68 @@ DROP TABLE IF EXISTS `video_scores`;
 CREATE TABLE `video_scores` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `video_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `scorer_name` varchar(100) DEFAULT NULL,
+  `scorer_class_code` varchar(40) DEFAULT NULL,
+  `scorer_group_name` varchar(100) DEFAULT NULL,
+  `scorer_ip` varchar(64) DEFAULT NULL,
+  `scorer_user_agent` varchar(255) DEFAULT NULL,
   `content_score` tinyint(3) unsigned NOT NULL,
   `delivery_score` tinyint(3) unsigned NOT NULL,
   `technical_score` tinyint(3) unsigned NOT NULL,
   `defense_score` tinyint(3) unsigned NOT NULL,
   `comment` text,
+  `presentation_appearance_score` tinyint(4) DEFAULT NULL,
+  `presentation_language_score` tinyint(4) DEFAULT NULL,
+  `presentation_timing_score` tinyint(4) DEFAULT NULL,
+  `principle_analysis_score` tinyint(4) DEFAULT NULL,
+  `code_analysis_score` tinyint(4) DEFAULT NULL,
+  `algorithm_design_score` tinyint(4) DEFAULT NULL,
+  `implementation_score` tinyint(4) DEFAULT NULL,
+  `logic_quality_score` tinyint(4) DEFAULT NULL,
+  `ui_design_score` tinyint(4) DEFAULT NULL,
+  `extra_feature_score` tinyint(4) DEFAULT NULL,
+  `answer_clarity_score` tinyint(4) DEFAULT NULL,
+  `knowledge_score` tinyint(4) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_video_score_user` (`video_id`,`user_id`),
+  UNIQUE KEY `uniq_video_scorer_class_name` (`video_id`,`scorer_class_code`,`scorer_name`),
   KEY `idx_video_scores_user` (`user_id`),
   CONSTRAINT `fk_video_scores_video` FOREIGN KEY (`video_id`) REFERENCES `videos` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_video_scores_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `video_allowed_classes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `video_allowed_classes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `video_id` int(11) NOT NULL,
+  `class_code` varchar(40) NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_video_allowed_class` (`video_id`,`class_code`),
+  KEY `idx_video_allowed_class` (`class_code`),
+  CONSTRAINT `fk_video_allowed_classes_video` FOREIGN KEY (`video_id`) REFERENCES `videos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `video_admin_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `video_admin_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `username` varchar(100) DEFAULT NULL,
+  `action` varchar(60) NOT NULL,
+  `class_code` varchar(40) DEFAULT NULL,
+  `detail` varchar(255) DEFAULT NULL,
+  `ip` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_video_admin_logs_created_at` (`created_at`),
+  KEY `idx_video_admin_logs_class_code` (`class_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
