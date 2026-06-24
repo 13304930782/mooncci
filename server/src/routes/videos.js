@@ -1130,6 +1130,27 @@ router.get('/admin/:id/scores', authRequired, videoReviewerOnly, async (req, res
   }
 });
 
+router.delete('/admin/:id/scores/:scoreId', authRequired, videoReviewerOnly, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+
+    const [result] = await db.query(
+      'DELETE FROM video_scores WHERE id=? AND video_id=?',
+      [req.params.scoreId, req.params.id]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: '评分记录不存在' });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[videos/admin/delete-score]', err);
+    res.status(500).json({ message: '评分删除失败' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, false);
@@ -1160,7 +1181,7 @@ router.post('/', authRequired, editorOrAdmin, async (req, res) => {
     const publishedAt = status === 'published' ? new Date() : null;
     const source = normalizeSourcePayload(req.body);
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
-    const allowedClasses = cleanAllowedClasses(req.body.allowed_class_codes ?? req.body.allowedClassCodes);
+    const allowedClasses = classCode ? [classCode] : [];
 
     const [result] = await db.query(
       `
@@ -1213,7 +1234,7 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
     const publishedAt = status === 'published' ? (video.published_at || new Date()) : null;
     const source = normalizeSourcePayload(req.body, video);
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
-    const allowedClasses = cleanAllowedClasses(req.body.allowed_class_codes ?? req.body.allowedClassCodes);
+    const allowedClasses = classCode ? [classCode] : [];
 
     if (source.source_type !== 'local' && video.video_filename) {
       removeFile(videoPathFor(video.video_filename));

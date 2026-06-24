@@ -250,18 +250,13 @@ export default function AdminVideosPage() {
   }, [canReviewVideos, rankingVideoClass]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  const toggleAllowedClass = (classCode: string) => {
     setForm((current) => {
-      const next = new Set(current.allowed_class_codes);
-      if (next.has(classCode)) {
-        next.delete(classCode);
-      } else {
-        next.add(classCode);
+      if (key === 'class_code') {
+        const classCode = String(value || '');
+        return { ...current, class_code: classCode, allowed_class_codes: classCode ? [classCode] : [] };
       }
-      return { ...current, allowed_class_codes: Array.from(next) };
+
+      return { ...current, [key]: value };
     });
   };
 
@@ -272,7 +267,7 @@ export default function AdminVideosPage() {
       summary: video.summary || '',
       team_name: getGroupNumber(video.team_name) || '',
       class_code: video.class_code || '',
-      allowed_class_codes: Array.isArray(video.allowed_class_codes) ? video.allowed_class_codes : [],
+      allowed_class_codes: video.class_code ? [video.class_code] : [],
       speaker_names: video.speaker_names || '',
       source_type: video.source_type || 'local',
       video_url: video.video_url || '',
@@ -300,6 +295,7 @@ export default function AdminVideosPage() {
       const normalizedCoverImage = form.cover_image.trim();
       const normalizedTeamName = formatTeamNameFromNumber(form.team_name);
 
+      const syncedAllowedClasses = form.class_code ? [form.class_code] : [];
       const payload = {
         ...form,
         title: form.title.trim() || (normalizedTeamName ? `${normalizedTeamName}答辩视频` : ''),
@@ -307,8 +303,8 @@ export default function AdminVideosPage() {
         team_name: normalizedTeamName,
         class_code: form.class_code,
         classCode: form.class_code,
-        allowed_class_codes: form.allowed_class_codes,
-        allowedClassCodes: form.allowed_class_codes,
+        allowed_class_codes: syncedAllowedClasses,
+        allowedClassCodes: syncedAllowedClasses,
         speaker_names: form.speaker_names.trim(),
         source_type: form.source_type,
         sourceType: form.source_type,
@@ -402,6 +398,21 @@ export default function AdminVideosPage() {
       setScores(Array.isArray(data.scores) ? data.scores : []);
     } catch (err: any) {
       showAppToast(err.message || '评分明细加载失败');
+    }
+  };
+
+  const removeScore = async (score: ScoreRow) => {
+    if (!scoreVideo) return;
+    if (!window.confirm(`确定删除 ${score.username || '该用户'} 的评分记录吗？`)) return;
+
+    try {
+      await api(`/videos/admin/${scoreVideo.id}/scores/${score.id}`, { method: 'DELETE' });
+      showAppToast('评分记录已删除');
+      await loadScores(scoreVideo);
+      loadVideos();
+      loadRankings();
+    } catch (err: any) {
+      showAppToast(err.message || '评分删除失败');
     }
   };
 
@@ -568,14 +579,14 @@ export default function AdminVideosPage() {
             </label>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-gray-700">允许评分班级</div>
-              <p className="mt-1 text-xs text-gray-500">不勾选时默认四个班级入口都可以评分；勾选后只允许选中的班级评分。</p>
+              <p className="mt-1 text-xs text-gray-500">这里会跟随所属班级自动同步，四个班级互相独立，只允许本班学生评分。</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {videoClassOptions.map((item) => (
                   <label key={item.code} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-gray-700">
                     <input
                       type="checkbox"
-                      checked={form.allowed_class_codes.includes(item.code)}
-                      onChange={() => toggleAllowedClass(item.code)}
+                      checked={item.code === form.class_code}
+                      disabled
                     />
                     {item.label}
                   </label>
@@ -818,6 +829,7 @@ export default function AdminVideosPage() {
                   <th className="py-3 pr-4">IP</th>
                   <th className="py-3 pr-4">时间</th>
                   <th className="py-3 pr-4">点评</th>
+                  <th className="py-3 pr-4">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -833,11 +845,21 @@ export default function AdminVideosPage() {
                     <td className="py-3 pr-4">{score.scorer_ip || '-'}</td>
                     <td className="py-3 pr-4">{score.updated_at ? new Date(score.updated_at).toLocaleString('zh-CN', { hour12: false }) : '-'}</td>
                     <td className="max-w-md py-3 pr-4 text-gray-600">{score.comment || '-'}</td>
+                    <td className="py-3 pr-4">
+                      <button
+                        type="button"
+                        onClick={() => removeScore(score)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        删除
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {scores.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-6 text-center text-gray-500">暂无评分</td>
+                    <td colSpan={11} className="py-6 text-center text-gray-500">暂无评分</td>
                   </tr>
                 )}
               </tbody>
