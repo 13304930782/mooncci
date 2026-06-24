@@ -1143,6 +1143,40 @@ router.get('/admin/:id/scores', authRequired, videoReviewerOnly, async (req, res
   }
 });
 
+router.get('/admin/:id/scores/export', authRequired, videoReviewerOnly, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+
+    const [scoreRows] = await db.query(
+      `
+      SELECT
+        s.*,
+        COALESCE(u.username, s.scorer_name) AS username
+      FROM video_scores s
+      LEFT JOIN users u ON u.id = s.user_id
+      WHERE s.video_id=?
+      ORDER BY s.scorer_class_code ASC, s.scorer_group_name ASC, s.updated_at ASC
+      `,
+      [req.params.id]
+    );
+
+    const rows = scoreRows.length
+      ? scoreRows.map((score) => ({ video, score: mapScoreRow(score) }))
+      : [{ video, score: null }];
+    const csv = buildScoreRecordCsv(rows);
+    const groupName = cleanString(video.team_name || `video-${video.id}`, 80).replace(/[\\/:*?"<>|]/g, '-');
+    const filename = `video-score-detail-${groupName}-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.send(csv);
+  } catch (err) {
+    console.error('[videos/admin/scores/export]', err);
+    res.status(500).json({ message: '评分明细导出失败' });
+  }
+});
+
 router.delete('/admin/:id/scores/:scoreId', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, true);

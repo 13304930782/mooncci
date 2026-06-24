@@ -808,9 +808,18 @@ export default function AdminVideosPage() {
               <h2 className="text-xl font-bold text-gray-900">评分明细：{getVideoDisplayTitle(scoreVideo)}</h2>
               <p className="mt-1 text-sm text-gray-500">共 {scores.length} 条评分，可用于课堂汇总。</p>
             </div>
-            <button type="button" onClick={() => setScoreVideo(null)} className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
-              收起
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/videos/admin/${scoreVideo.id}/scores/export`}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                <Download className="h-4 w-4" />
+                导出本组明细
+              </a>
+              <button type="button" onClick={() => setScoreVideo(null)} className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700">
+                收起
+              </button>
+            </div>
           </div>
 
           <div className="mt-5 overflow-x-auto">
