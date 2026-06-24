@@ -221,6 +221,28 @@ export default function AdminVideosPage() {
     if (rankingVideoClass) query.set('scorer_class_code', rankingVideoClass);
     return `/api/videos/admin/rankings/export${query.toString() ? `?${query.toString()}` : ''}`;
   }, [rankingVideoClass]);
+  const exportPreview = useMemo(() => {
+    if (!rankingVideoClass) {
+      return '请选择班级后再导出，未选择时不会导出数据。';
+    }
+
+    const classLabel = getVideoClassLabel(rankingVideoClass) || rankingVideoClass;
+    const groupNumbers = rankings
+      .map((row) => Number(getGroupNumber(row.team_name)))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const maxGroupNumber = groupNumbers.length ? Math.max(...groupNumbers) : 0;
+    const scoreCount = rankings.reduce((sum, row) => sum + Number(row.score_count || 0), 0);
+
+    if (!rankings.length) {
+      return `当前将导出：${classLabel}，暂无视频数据。`;
+    }
+
+    if (!maxGroupNumber) {
+      return `当前将导出：${classLabel}，共 ${scoreCount} 条评分记录；未填写组号的视频会按原数据导出。`;
+    }
+
+    return `当前将导出：${classLabel}，第1组到第${maxGroupNumber}组，共 ${scoreCount} 条评分记录；没有数据的组会留空。`;
+  }, [rankingVideoClass, rankings]);
 
   const loadRankings = () => {
     if (!canReviewVideos) return;
@@ -575,6 +597,11 @@ export default function AdminVideosPage() {
               </a>
             </div>
           </div>
+          <div className={`mt-4 rounded-2xl px-4 py-3 text-sm leading-6 ${
+            rankingClassSelected ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'
+          }`}>
+            {exportPreview}
+          </div>
 
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -925,7 +952,55 @@ export default function AdminVideosPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-3 md:hidden">
+            {scores.map((score) => (
+              <div key={score.id} className="rounded-2xl border border-gray-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-bold text-gray-900">{score.username}</div>
+                    <div className="mt-1 text-xs leading-5 text-gray-500">
+                      {getVideoClassLabel(score.scorer_class_code) || '-'} · {score.scorer_group_name || '-'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-blue-50 px-3 py-2 text-right font-black text-blue-700">
+                    {score.total_score} / {score.max_score || 50}
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+                  <div className="rounded-xl bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">自述</div>
+                    <div className="mt-1 font-bold">{score.self_score ?? score.content_score}</div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">项目</div>
+                    <div className="mt-1 font-bold">{score.project_score ?? score.technical_score}</div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 p-3">
+                    <div className="text-xs text-gray-500">回答</div>
+                    <div className="mt-1 font-bold">{score.answer_score ?? score.defense_score}</div>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-1 text-xs leading-5 text-gray-500">
+                  <div>IP：{score.scorer_ip || '-'}</div>
+                  <div>时间：{score.updated_at ? new Date(score.updated_at).toLocaleString('zh-CN', { hour12: false }) : '-'}</div>
+                  <div>点评：{score.comment || '-'}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeScore(score)}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  删除
+                </button>
+              </div>
+            ))}
+            {scores.length === 0 && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">暂无评分</div>
+            )}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="min-w-full text-left text-sm">
               <thead className="text-xs text-gray-500">
                 <tr className="border-b">
