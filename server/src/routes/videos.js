@@ -876,10 +876,21 @@ async function fetchRankingRows(user, filters = {}) {
 async function fetchScoreRecordRows(user, filters = {}) {
   const classCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
   const videos = await fetchAdminVideos(user, classCode ? { video_class_code: classCode } : filters);
-  const videoIds = videos.map((video) => Number(video.id));
-  if (!videoIds.length) return [];
+  const maxGroup = videos.reduce((max, video) => {
+    const number = groupNumber(video.team_name);
+    return Number.isFinite(number) && number !== Number.MAX_SAFE_INTEGER ? Math.max(max, number) : max;
+  }, 0);
+  if (!maxGroup) return [];
 
-  const videoById = new Map(videos.map((video) => [Number(video.id), video]));
+  const videoByGroup = new Map();
+  videos.forEach((video) => {
+    const number = groupNumber(video.team_name);
+    if (Number.isFinite(number) && number !== Number.MAX_SAFE_INTEGER && !videoByGroup.has(number)) {
+      videoByGroup.set(number, video);
+    }
+  });
+
+  const videoIds = videos.map((video) => Number(video.id));
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
@@ -901,23 +912,45 @@ async function fetchScoreRecordRows(user, filters = {}) {
     params
   );
 
-  const rows = scoreRows.map((score) => ({
-    video: videoById.get(Number(score.video_id)),
-    score: mapScoreRow(score),
-  })).filter((row) => row.video);
-
-  const scoredVideoIds = new Set(rows.map((row) => Number(row.video.id)));
-  videos.forEach((video) => {
-    if (!scoredVideoIds.has(Number(video.id))) rows.push({ video, score: null });
+  const scoresByVideoId = new Map();
+  scoreRows.forEach((score) => {
+    const videoId = Number(score.video_id);
+    const list = scoresByVideoId.get(videoId) || [];
+    list.push(score);
+    scoresByVideoId.set(videoId, list);
   });
 
-  rows.sort((a, b) => (
-    groupNumber(a.video?.team_name) - groupNumber(b.video?.team_name) ||
-    String(a.video?.team_name || '').localeCompare(String(b.video?.team_name || ''), 'zh-Hans-CN') ||
-    groupNumber(a.score?.scorer_group_name) - groupNumber(b.score?.scorer_group_name) ||
-    String(a.score?.scorer_group_name || '').localeCompare(String(b.score?.scorer_group_name || ''), 'zh-Hans-CN') ||
-    Number(a.video?.id || 0) - Number(b.video?.id || 0)
-  ));
+  const rows = [];
+  for (let number = 1; number <= maxGroup; number += 1) {
+    const video = videoByGroup.get(number) || {
+      id: null,
+      title: '',
+      class_code: classCode,
+      class_label: classLabel(classCode),
+      team_name: `第${number}组`,
+      speaker_names: '',
+      status: '',
+    };
+    const scores = video?.id ? (scoresByVideoId.get(Number(video.id)) || []) : [];
+    const score = scores.length ? {
+      scorer_class_code: '',
+      scorer_group_name: '',
+      username: '',
+      scorer_name: '',
+      total_score: roundNumber(average(scores.map(scoreTotal)), 2),
+      updated_at: '',
+      scorer_ip: '',
+      comment: '',
+    } : null;
+
+    if (score) {
+      detailedScoreFields.forEach((field) => {
+        score[field.key] = roundNumber(average(scores.map((item) => item[field.key]).filter((value) => value != null)), 2);
+      });
+    }
+
+    rows.push({ video, score });
+  }
 
   return rows;
 }
