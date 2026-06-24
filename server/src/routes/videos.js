@@ -100,6 +100,11 @@ function normalizeGroupName(value) {
     .replace(/[()（）【】\[\]{}]/g, '');
 }
 
+function groupNumber(value) {
+  const match = String(value || '').match(/\d+/);
+  return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
+}
+
 function cleanSourceType(value, fallback = 'local') {
   const next = cleanString(value, 20).toLowerCase();
   return sourceTypes.has(next) ? next : fallback;
@@ -839,17 +844,17 @@ async function fetchAdminVideos(user, filters = {}) {
 }
 
 async function fetchRankingRows(user, filters = {}) {
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
-  const videos = await fetchAdminVideos(user, scorerClassCode ? {} : filters);
+  const classCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
+  const videos = await fetchAdminVideos(user, classCode ? { video_class_code: classCode } : filters);
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
-  if (scorerClassCode) {
+  if (classCode) {
     where.push('s.scorer_class_code=?');
-    params.push(scorerClassCode);
+    params.push(classCode);
   }
 
   const [scoreRows] = await db.query(
@@ -865,12 +870,12 @@ async function fetchRankingRows(user, filters = {}) {
     params
   );
 
-  return buildRankingRows(videos, scoreRows).filter((row) => row.score_count > 0);
+  return buildRankingRows(videos, scoreRows);
 }
 
 async function fetchScoreRecordRows(user, filters = {}) {
-  const scorerClassCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
-  const videos = await fetchAdminVideos(user, scorerClassCode ? {} : filters);
+  const classCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
+  const videos = await fetchAdminVideos(user, classCode ? { video_class_code: classCode } : filters);
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
@@ -878,9 +883,9 @@ async function fetchScoreRecordRows(user, filters = {}) {
   const where = ['s.video_id IN (?)'];
   const params = [videoIds];
 
-  if (scorerClassCode) {
+  if (classCode) {
     where.push('s.scorer_class_code=?');
-    params.push(scorerClassCode);
+    params.push(classCode);
   }
 
   const [scoreRows] = await db.query(
@@ -896,10 +901,25 @@ async function fetchScoreRecordRows(user, filters = {}) {
     params
   );
 
-  return scoreRows.map((score) => ({
+  const rows = scoreRows.map((score) => ({
     video: videoById.get(Number(score.video_id)),
     score: mapScoreRow(score),
   })).filter((row) => row.video);
+
+  const scoredVideoIds = new Set(rows.map((row) => Number(row.video.id)));
+  videos.forEach((video) => {
+    if (!scoredVideoIds.has(Number(video.id))) rows.push({ video, score: null });
+  });
+
+  rows.sort((a, b) => (
+    groupNumber(a.video?.team_name) - groupNumber(b.video?.team_name) ||
+    String(a.video?.team_name || '').localeCompare(String(b.video?.team_name || ''), 'zh-Hans-CN') ||
+    groupNumber(a.score?.scorer_group_name) - groupNumber(b.score?.scorer_group_name) ||
+    String(a.score?.scorer_group_name || '').localeCompare(String(b.score?.scorer_group_name || ''), 'zh-Hans-CN') ||
+    Number(a.video?.id || 0) - Number(b.video?.id || 0)
+  ));
+
+  return rows;
 }
 
 function csvCell(value) {
@@ -983,14 +1003,14 @@ function buildScoreRecordCsv(rows) {
     lines.push([
       video.class_label || classLabel(video.class_code) || '',
       video.team_name || '',
-      classLabel(score.scorer_class_code) || '',
-      score.scorer_group_name || '',
-      score.username || score.scorer_name || '',
-      ...detailedScoreFields.map((field) => score[field.key] ?? ''),
-      score.total_score,
-      score.updated_at || '',
-      score.scorer_ip || '',
-      score.comment || '',
+      score ? classLabel(score.scorer_class_code) || '' : '',
+      score?.scorer_group_name || '',
+      score?.username || score?.scorer_name || '',
+      ...detailedScoreFields.map((field) => score?.[field.key] ?? ''),
+      score?.total_score ?? '',
+      score?.updated_at || '',
+      score?.scorer_ip || '',
+      score?.comment || '',
     ].map(csvCell).join(','));
   });
 
