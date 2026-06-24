@@ -754,31 +754,21 @@ function buildRankingRows(videos, scoreRows) {
     grouped.get(key).push(row);
   });
 
-  const maxScoreCount = Math.max(...videos.map((video) => Number(video.score_count || 0)), 0);
-
   const rows = videos.map((video) => {
     const scores = grouped.get(Number(video.id)) || [];
     const weightedScores = scores.map(weightedScore).filter((value) => Number.isFinite(value));
+    const totalScores = scores.map((row) => normalizedScore(row) / 2).filter((value) => Number.isFinite(value));
     const scoreCount = weightedScores.length;
 
     const weightedAvg = average(weightedScores);
     const scoreStddev = stddev(weightedScores, weightedAvg);
+    const totalAvg = average(totalScores);
 
     const scorePartRows = scores.map(scoreParts);
     const avgContent = average(scorePartRows.map((row) => Number(row.self || 0)));
     const avgDelivery = null;
     const avgTechnical = average(scorePartRows.map((row) => Number(row.project || 0)));
     const avgDefense = average(scorePartRows.map((row) => Number(row.answer || 0)));
-
-    // 最终排名分：主体是全班均分；人数和稳定度只做小幅校正；最后用维度小权重拆平分。
-    // 这样不会因为同分而全挤在一起，也不会让随机 id 影响排名。
-    const baseScore100 = weightedAvg == null ? null : weightedAvg;
-    const participationBonus = maxScoreCount > 0 ? Math.min(scoreCount / maxScoreCount, 1) * 0.30 : 0;
-    const consistencyBonus = scoreStddev == null ? 0 : Math.max(0, 1 - Math.min(scoreStddev / 2.5, 1)) * 0.20;
-    const tieBreaker = scoreCount > 0
-      ? Number(avgTechnical || 0) * 0.003 + Number(avgContent || 0) * 0.002 + Number(avgDelivery || 0) * 0.001 + Number(avgDefense || 0) * 0.0005 + scoreCount * 0.0001
-      : 0;
-    const finalScore = baseScore100 == null ? null : baseScore100 + participationBonus + consistencyBonus + tieBreaker;
 
     return {
       id: video.id,
@@ -796,10 +786,10 @@ function buildRankingRows(videos, scoreRows) {
       avg_defense_score: roundNumber(avgDefense, 2),
       weighted_score: roundNumber(weightedAvg, 3),
       score_stddev: roundNumber(scoreStddev, 3),
-      participation_bonus: roundNumber(participationBonus, 3),
-      consistency_bonus: roundNumber(consistencyBonus, 3),
-      tie_breaker: roundNumber(tieBreaker, 4),
-      final_score: roundNumber(finalScore, 3),
+      participation_bonus: 0,
+      consistency_bonus: 0,
+      tie_breaker: 0,
+      final_score: roundNumber(totalAvg, 3),
     };
   });
 
@@ -968,15 +958,10 @@ function buildRankingCsv(rows) {
     '分组',
     '主讲人',
     '评分人数',
-    '最终排名分',
-    '归一化均分',
+    '总分',
     '自述均分',
     '项目均分',
     '回答均分',
-    '标准差',
-    '人数加成',
-    '稳定度加成',
-    '拆分同分小权重',
     '状态',
   ];
 
@@ -991,20 +976,15 @@ function buildRankingCsv(rows) {
       row.speaker_names,
       row.score_count,
       row.final_score,
-      row.weighted_score,
       row.avg_content_score,
       row.avg_technical_score,
       row.avg_defense_score,
-      row.score_stddev,
-      row.participation_bonus,
-      row.consistency_bonus,
-      row.tie_breaker,
       row.status === 'published' ? '已发布' : '草稿',
     ].map(csvCell).join(','));
   });
 
   lines.push('');
-  lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计；旧40分评分会自动归一化参与排名。'].map(csvCell).join(','));
+  lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计，排名按平均总分计算。'].map(csvCell).join(','));
 
   return `\ufeff${lines.join('\n')}`;
 }

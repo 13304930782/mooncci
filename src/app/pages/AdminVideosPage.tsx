@@ -443,9 +443,9 @@ export default function AdminVideosPage() {
                 <Trophy className="h-3.5 w-3.5" />
                 全班评分总排名
               </div>
-              <h2 className="mt-3 text-xl font-black text-gray-900">按每个视频的全班评分统计最佳分数</h2>
+              <h2 className="mt-3 text-xl font-black text-gray-900">按每个视频的全班评分统计总分</h2>
               <p className="mt-1 text-sm leading-6 text-gray-500">
-                新评分表满分 50 分：自述 5 分、项目分析设计与实现 35 分、回答问题 10 分；旧评分会自动归一化参与排名。
+                新评分表满分 50 分：自述 5 分、项目分析设计与实现 35 分、回答问题 10 分；排名按平均总分统计。
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -492,8 +492,7 @@ export default function AdminVideosPage() {
                   <th className="py-3 pr-4">排名</th>
                   <th className="py-3 pr-4">视频</th>
                   <th className="py-3 pr-4">评分人数</th>
-                  <th className="py-3 pr-4">最终排名分</th>
-                  <th className="py-3 pr-4">归一化均分</th>
+                  <th className="py-3 pr-4">总分</th>
                   <th className="py-3 pr-4">自述</th>
                   <th className="py-3 pr-4">项目</th>
                   <th className="py-3 pr-4">回答</th>
@@ -509,7 +508,6 @@ export default function AdminVideosPage() {
                     </td>
                     <td className="py-3 pr-4">{row.score_count}</td>
                     <td className="py-3 pr-4 font-black text-blue-700">{formatFinalScore(row.final_score)}</td>
-                    <td className="py-3 pr-4">{formatFinalScore(row.weighted_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_content_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_technical_score)}</td>
                     <td className="py-3 pr-4">{formatFinalScore(row.avg_defense_score)}</td>
@@ -517,12 +515,12 @@ export default function AdminVideosPage() {
                 ))}
                 {!rankingClassSelected && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-gray-500">请选择班级后查看排名和导出评分记录表。</td>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">请选择班级后查看排名和导出评分记录表。</td>
                   </tr>
                 )}
                 {rankingClassSelected && rankings.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
+                    <td colSpan={7} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
                   </tr>
                 )}
               </tbody>
