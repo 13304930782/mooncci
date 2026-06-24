@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BarChart3, CheckCircle2, LogIn, Star } from 'lucide-react';
 import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
@@ -200,6 +200,7 @@ function VideoPlayer({ video }: { video: VideoDetail }) {
 
 export default function VideoDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
   const { user } = useAuth();
@@ -347,15 +348,24 @@ export default function VideoDetailPage() {
   };
 
   const publicScoringEnabled = Number(video?.public_scoring_enabled || 0) === 1;
+  const fallbackListPath = selectedClassCode ? `/videos/${selectedClassCode}` : '/videos';
+  const goBackToList = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(fallbackListPath);
+  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.10),transparent_30rem),linear-gradient(135deg,#f8fafc,#eef6ff_48%,#f8fafc)] text-slate-950 dark:bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.14),transparent_30rem),linear-gradient(135deg,#020617,#0f172a_55%,#020617)] dark:text-white">
       <Header />
 
       <main className="mx-auto max-w-7xl px-4 pb-10 pt-28 sm:px-6 lg:pt-32">
-        <Link to="/videos" className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">
+        <button type="button" onClick={goBackToList} className="text-sm font-semibold text-blue-600 hover:underline dark:text-blue-300">
           返回视频栏目
-        </Link>
+        </button>
 
         {loading && (
           <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/75 p-6 text-slate-500 dark:border-slate-800 dark:bg-slate-900/75">
