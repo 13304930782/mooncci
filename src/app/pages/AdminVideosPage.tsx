@@ -207,6 +207,7 @@ export default function AdminVideosPage() {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingVideoClass, setRankingVideoClass] = useState('');
   const [videoListClass, setVideoListClass] = useState('');
+  const [classActionLoading, setClassActionLoading] = useState(false);
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
   const role = user?.role || 'user';
@@ -420,6 +421,61 @@ export default function AdminVideosPage() {
     }
   };
 
+  const updateClassScoring = async (enabled: boolean) => {
+    if (!rankingVideoClass) {
+      showAppToast('请先选择班级');
+      return;
+    }
+
+    const classLabel = getVideoClassLabel(rankingVideoClass) || rankingVideoClass;
+    const actionText = enabled ? '开放' : '停止';
+    if (!window.confirm(`确定${actionText} ${classLabel} 的所有视频评分吗？`)) return;
+
+    try {
+      setClassActionLoading(true);
+      const data = await api('/videos/admin/class-scoring', {
+        method: 'POST',
+        body: JSON.stringify({
+          class_code: rankingVideoClass,
+          public_scoring_enabled: enabled ? 1 : 0,
+        }),
+      });
+      showAppToast(`${classLabel} 已${actionText}评分，共更新 ${data.affected || 0} 个视频`);
+      loadVideos();
+      loadRankings();
+    } catch (err: any) {
+      showAppToast(err.message || '班级评分状态更新失败');
+    } finally {
+      setClassActionLoading(false);
+    }
+  };
+
+  const clearClassScores = async () => {
+    if (!rankingVideoClass) {
+      showAppToast('请先选择班级');
+      return;
+    }
+
+    const classLabel = getVideoClassLabel(rankingVideoClass) || rankingVideoClass;
+    if (!window.confirm(`确定清空 ${classLabel} 的所有评分记录吗？这个操作不能恢复。`)) return;
+
+    try {
+      setClassActionLoading(true);
+      const data = await api('/videos/admin/class-scores/clear', {
+        method: 'POST',
+        body: JSON.stringify({ class_code: rankingVideoClass }),
+      });
+      showAppToast(`${classLabel} 已清空 ${data.deleted || 0} 条评分记录`);
+      setScores([]);
+      loadVideos();
+      loadRankings();
+    } catch (err: any) {
+      showAppToast(err.message || '班级评分清空失败');
+    } finally {
+      setClassActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] bg-gradient-to-br from-slate-950 via-blue-950 to-purple-950 p-7 text-white shadow-xl">
@@ -471,6 +527,37 @@ export default function AdminVideosPage() {
                 <RefreshCw className="h-4 w-4" />
                 {rankingLoading ? '刷新中...' : '刷新数据'}
               </button>
+              {canManageVideos && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => updateClassScoring(true)}
+                    disabled={!rankingClassSelected || classActionLoading}
+                    className="rounded-2xl border border-emerald-200 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    开放本班评分
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateClassScoring(false)}
+                    disabled={!rankingClassSelected || classActionLoading}
+                    className="rounded-2xl border border-amber-200 px-4 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    停止本班评分
+                  </button>
+                </>
+              )}
+              {manager && (
+                <button
+                  type="button"
+                  onClick={clearClassScores}
+                  disabled={!rankingClassSelected || classActionLoading}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-red-200 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  清空本班评分
+                </button>
+              )}
               <a
                 href={rankingExportUrl}
                 onClick={(event) => {

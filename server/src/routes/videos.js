@@ -1104,6 +1104,45 @@ router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req
   }
 });
 
+router.post('/admin/class-scoring', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    if (!classCode) return res.status(400).json({ message: '请选择班级' });
+
+    const enabled = cleanBoolean(req.body.public_scoring_enabled ?? req.body.publicScoringEnabled ?? req.body.enabled);
+    const [result] = await db.query(
+      'UPDATE videos SET public_scoring_enabled=? WHERE class_code=?',
+      [enabled, classCode]
+    );
+
+    res.json({ ok: true, class_code: classCode, public_scoring_enabled: enabled, affected: result.affectedRows || 0 });
+  } catch (err) {
+    console.error('[videos/admin/class-scoring]', err);
+    res.status(500).json({ message: '班级评分状态更新失败' });
+  }
+});
+
+router.post('/admin/class-scores/clear', authRequired, adminOnly, async (req, res) => {
+  try {
+    const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    if (!classCode) return res.status(400).json({ message: '请选择班级' });
+
+    const [result] = await db.query(
+      `
+      DELETE s FROM video_scores s
+      INNER JOIN videos v ON v.id=s.video_id
+      WHERE v.class_code=?
+      `,
+      [classCode]
+    );
+
+    res.json({ ok: true, class_code: classCode, deleted: result.affectedRows || 0 });
+  } catch (err) {
+    console.error('[videos/admin/class-scores/clear]', err);
+    res.status(500).json({ message: '班级评分清空失败' });
+  }
+});
+
 router.get('/admin', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     res.json(await fetchAdminVideos(req.user, req.query));
