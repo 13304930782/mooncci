@@ -5,7 +5,7 @@ import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
-import { getVideoClassLabel, isVideoClassCode, videoClassOptions } from '../lib/videoClasses';
+import { getVideoClassLabel, isVideoClassCode } from '../lib/videoClasses';
 import { showAppToast } from '../components/AppToast';
 
 type VideoDetail = {
@@ -201,7 +201,7 @@ function VideoPlayer({ video }: { video: VideoDetail }) {
 export default function VideoDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoDetail | null>(null);
@@ -445,24 +445,21 @@ export default function VideoDetailPage() {
                     {publicScoringEnabled && (
                       <div className="block rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-900/40 dark:bg-blue-950/30">
                         <div className="mb-4 grid gap-3">
-                          <label className="block">
-                            <div className="text-sm font-semibold text-slate-900 dark:text-white">班级（必选）</div>
-                            <select
-                              value={selectedClassCode}
-                              onChange={(event) => {
-                                const next = event.target.value;
-                                setIdentityChecked(false);
-                                setScoreStatus(null);
-                                setSearchParams(next ? { class: next } : {});
-                              }}
-                              className="mt-2 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-blue-900 dark:bg-slate-950"
-                            >
-                              <option value="">请选择班级</option>
-                              {videoClassOptions.map((item) => (
-                                <option key={item.code} value={item.code}>{item.label}</option>
-                              ))}
-                            </select>
-                          </label>
+                          <div className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">班级</div>
+                            {selectedClassCode ? (
+                              <div className="mt-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 dark:border-blue-900 dark:bg-slate-950 dark:text-white">
+                                {selectedClassLabel}
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                                请先从对应班级入口进入视频，再进行评分。
+                                <Link to="/videos" className="mt-2 inline-flex rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white hover:bg-amber-700">
+                                  返回选择班级
+                                </Link>
+                              </div>
+                            )}
+                          </div>
                           <label className="block">
                             <div className="text-sm font-semibold text-slate-900 dark:text-white">组号（必填）</div>
                             <div className="mt-2 flex overflow-hidden rounded-lg border border-blue-200 bg-white focus-within:border-blue-500 dark:border-blue-900 dark:bg-slate-950">
