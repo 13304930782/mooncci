@@ -794,17 +794,12 @@ function buildRankingRows(videos, scoreRows) {
   });
 
   rows.sort((a, b) => {
-    if (a.final_score == null && b.final_score == null) return Number(a.id) - Number(b.id);
-    if (a.final_score == null) return 1;
-    if (b.final_score == null) return -1;
-    return b.final_score - a.final_score;
+    const groupDiff = groupNumber(a.team_name) - groupNumber(b.team_name);
+    if (groupDiff !== 0) return groupDiff;
+    return Number(a.id) - Number(b.id);
   });
 
-  let rank = 0;
-  return rows.map((row) => {
-    if (row.final_score != null) rank += 1;
-    return { ...row, rank: row.final_score == null ? null : rank };
-  });
+  return rows.map((row) => ({ ...row, rank: null }));
 }
 
 async function fetchAdminVideos(user, filters = {}) {
@@ -952,7 +947,7 @@ function csvCell(value) {
 
 function buildRankingCsv(rows) {
   const headers = [
-    '排名',
+    '组号',
     '视频标题',
     '所属班级',
     '分组',
@@ -969,7 +964,7 @@ function buildRankingCsv(rows) {
 
   rows.forEach((row) => {
     lines.push([
-      row.rank || '',
+      row.team_name || '',
       row.title,
       row.class_label || classLabel(row.class_code) || '',
       row.team_name,
@@ -984,7 +979,7 @@ function buildRankingCsv(rows) {
   });
 
   lines.push('');
-  lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计，排名按平均总分计算。'].map(csvCell).join(','));
+  lines.push(['评分说明', '新评分表满分50分，按自述5分、项目35分、回答问题10分统计，按组号顺序展示。'].map(csvCell).join(','));
 
   return `\ufeff${lines.join('\n')}`;
 }
@@ -1088,7 +1083,7 @@ router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) 
     res.json(await fetchRankingRows(req.user, req.query));
   } catch (err) {
     console.error('[videos/admin/rankings]', err);
-    res.status(500).json({ message: '评分排名加载失败' });
+    res.status(500).json({ message: '评分数据加载失败' });
   }
 });
 

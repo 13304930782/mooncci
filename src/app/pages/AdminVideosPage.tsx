@@ -235,7 +235,7 @@ export default function AdminVideosPage() {
     setRankingLoading(true);
     api(`/videos/admin/rankings${query.toString() ? `?${query.toString()}` : ''}`)
       .then((rows) => setRankings(Array.isArray(rows) ? rows : []))
-      .catch((err) => showAppToast(err.message || '评分排名加载失败'))
+      .catch((err) => showAppToast(err.message || '评分数据加载失败'))
       .finally(() => setRankingLoading(false));
   };
 
@@ -429,7 +429,7 @@ export default function AdminVideosPage() {
         </div>
         <h1 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">视频管理与评分统计</h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-          支持本地上传、外部 MP4 直链和 B站 / YouTube 等第三方嵌入；评分按“一个视频全班评分→后台统一统计排名”处理，并支持导出表格。
+          支持本地上传、外部 MP4 直链和 B站 / YouTube 等第三方嵌入；评分按“一个视频全班评分→后台按组汇总统计”处理，并支持导出表格。
         </p>
       </section>
 
@@ -445,11 +445,11 @@ export default function AdminVideosPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
                 <Trophy className="h-3.5 w-3.5" />
-                全班评分总排名
+                班级小组数据
               </div>
-              <h2 className="mt-3 text-xl font-black text-gray-900">按每个视频的全班评分统计总分</h2>
+              <h2 className="mt-3 text-xl font-black text-gray-900">按组号顺序查看每组评分数据</h2>
               <p className="mt-1 text-sm leading-6 text-gray-500">
-                新评分表满分 50 分：自述 5 分、项目分析设计与实现 35 分、回答问题 10 分；排名按平均总分统计。
+                新评分表满分 50 分：自述 5 分、项目分析设计与实现 35 分、回答问题 10 分；数据按组号从小到大展示。
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -469,7 +469,7 @@ export default function AdminVideosPage() {
                 className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
               >
                 <RefreshCw className="h-4 w-4" />
-                {rankingLoading ? '刷新中...' : '刷新排名'}
+                {rankingLoading ? '刷新中...' : '刷新数据'}
               </button>
               <a
                 href={rankingExportUrl}
@@ -493,7 +493,7 @@ export default function AdminVideosPage() {
             <table className="min-w-full text-left text-sm">
               <thead className="text-xs text-gray-500">
                 <tr className="border-b">
-                  <th className="py-3 pr-4">排名</th>
+                  <th className="py-3 pr-4">组号</th>
                   <th className="py-3 pr-4">视频</th>
                   <th className="py-3 pr-4">评分人数</th>
                   <th className="py-3 pr-4">总分</th>
@@ -505,7 +505,7 @@ export default function AdminVideosPage() {
               <tbody>
                 {rankings.map((row) => (
                   <tr key={row.id} className="border-b last:border-0">
-                    <td className="py-3 pr-4 font-black text-amber-600">{row.rank ? `#${row.rank}` : '-'}</td>
+                    <td className="py-3 pr-4 font-black text-amber-600">{getDisplayTeamName(row.team_name) || '-'}</td>
                     <td className="min-w-64 py-3 pr-4">
                       <div className="font-bold text-gray-900">{getVideoDisplayTitle(row)}</div>
                       <div className="mt-1 text-xs text-gray-500">{getDisplayTeamName(row.team_name) || '未填写组号'} · {row.speaker_names || '未填写主讲人'}</div>
@@ -519,12 +519,12 @@ export default function AdminVideosPage() {
                 ))}
                 {!rankingClassSelected && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-gray-500">请选择班级后查看排名和导出评分记录表。</td>
+                    <td colSpan={7} className="py-8 text-center text-gray-500">请选择班级后查看每组评分数据和导出评分记录表。</td>
                   </tr>
                 )}
                 {rankingClassSelected && rankings.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-gray-500">暂无评分排名，等同学提交评分后这里会自动统计。</td>
+                    <td colSpan={7} className="py-6 text-center text-gray-500">当前班级还没有视频数据。</td>
                   </tr>
                 )}
               </tbody>
