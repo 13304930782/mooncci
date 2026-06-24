@@ -26,7 +26,7 @@ const navLinks = [
 const tagSuggestions = ['Web 全栈', 'Linux', 'OpenWrt', 'Nginx', 'MySQL', '部署排障'];
 
 function canEnterAdmin(role?: string) {
-  return role === 'owner' || role === 'admin' || role === 'editor';
+  return role === 'owner' || role === 'admin' || role === 'editor' || role === 'teacher';
 }
 
 function parseTags(raw: unknown): string[] {

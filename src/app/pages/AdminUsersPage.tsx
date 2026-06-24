@@ -81,6 +81,7 @@ export default function AdminUsersPage() {
                       <option value="owner">站长</option>
                       <option value="admin">管理员</option>
                       <option value="editor">编辑</option>
+                      <option value="teacher">老师</option>
                       <option value="user">普通用户</option>
                     </select>
                   </td>

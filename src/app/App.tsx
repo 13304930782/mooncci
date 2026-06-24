@@ -51,6 +51,10 @@ function isWriterRole(role?: string) {
   return role === 'owner' || role === 'admin' || role === 'editor';
 }
 
+function isVideoReviewerRole(role?: string) {
+  return isWriterRole(role) || role === 'teacher';
+}
+
 function AuthCheckingScreen() {
   return (
     <div className="grid min-h-screen place-items-center bg-slate-50 px-6 text-slate-600 dark:bg-slate-950 dark:text-slate-300">
@@ -66,10 +70,12 @@ function Guard({
   children,
   adminOnly = false,
   writerOnly = false,
+  videoReviewerOnly = false,
 }: {
   children: ReactNode;
   adminOnly?: boolean;
   writerOnly?: boolean;
+  videoReviewerOnly?: boolean;
 }) {
   const { user, loading } = useAuth();
 
@@ -80,6 +86,7 @@ function Guard({
   if (!user) return <Navigate to="/login" />;
   if (adminOnly && !isAdminRole(user.role)) return <Navigate to="/admin" />;
   if (writerOnly && !isWriterRole(user.role)) return <Navigate to="/admin/editor-apply" />;
+  if (videoReviewerOnly && !isVideoReviewerRole(user.role)) return <Navigate to="/admin/editor-apply" />;
 
   return <>{children}</>;
 }
@@ -113,11 +120,11 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-            <Route path="/admin" element={<Guard writerOnly><AdminShell><AdminPage /></AdminShell></Guard>} />
+            <Route path="/admin" element={<Guard videoReviewerOnly><AdminShell><AdminPage /></AdminShell></Guard>} />
             <Route path="/admin/posts" element={<Guard writerOnly><AdminShell><AdminPostsPage /></AdminShell></Guard>} />
             <Route path="/admin/write" element={<Guard writerOnly><AdminShell><AdminWritePage /></AdminShell></Guard>} />
             <Route path="/admin/media" element={<Guard writerOnly><AdminShell><AdminMediaPage /></AdminShell></Guard>} />
-            <Route path="/admin/videos" element={<Guard writerOnly><AdminShell><AdminVideosPage /></AdminShell></Guard>} />
+            <Route path="/admin/videos" element={<Guard videoReviewerOnly><AdminShell><AdminVideosPage /></AdminShell></Guard>} />
             <Route path="/admin/posts/:id/edit" element={<Guard writerOnly><AdminShell><AdminWritePage /></AdminShell></Guard>} />
             <Route path="/admin/users" element={<Guard adminOnly><AdminShell><AdminUsersPage /></AdminShell></Guard>} />
             <Route path="/admin/comments" element={<Guard adminOnly><AdminShell><AdminCommentsPage /></AdminShell></Guard>} />

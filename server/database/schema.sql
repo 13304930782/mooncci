@@ -193,7 +193,7 @@ CREATE TABLE `users` (
   `username` varchar(50) NOT NULL,
   `email` varchar(120) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` enum('owner','admin','editor','user') NOT NULL DEFAULT 'user',
+  `role` enum('owner','admin','editor','teacher','user') NOT NULL DEFAULT 'user',
   `status` enum('active','disabled') NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

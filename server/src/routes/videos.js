@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const FileType = require('file-type');
 const db = require('../db');
-const { authRequired, adminOnly, editorOrAdmin, isAdminLike } = require('../middleware/auth');
+const { authRequired, adminOnly, editorOrAdmin, videoReviewerOnly, isAdminLike } = require('../middleware/auth');
 
 const router = express.Router();
 const videoDir = path.join(__dirname, '../../uploads/videos');
@@ -1047,7 +1047,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
+router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     if (!cleanClassCode(req.query.video_class_code || req.query.class_code)) {
       res.json([]);
@@ -1061,7 +1061,7 @@ router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
   }
 });
 
-router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) => {
+router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     const rows = cleanClassCode(req.query.video_class_code || req.query.class_code)
       ? await fetchScoreRecordRows(req.user, req.query)
@@ -1078,7 +1078,7 @@ router.get('/admin/rankings/export', authRequired, adminOnly, async (req, res) =
   }
 });
 
-router.get('/admin', authRequired, editorOrAdmin, async (req, res) => {
+router.get('/admin', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     res.json(await fetchAdminVideos(req.user));
   } catch (err) {
@@ -1087,7 +1087,7 @@ router.get('/admin', authRequired, editorOrAdmin, async (req, res) => {
   }
 });
 
-router.get('/admin/:id/scores', authRequired, adminOnly, async (req, res) => {
+router.get('/admin/:id/scores', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, true);
     if (!video) return res.status(404).json({ message: '视频不存在' });

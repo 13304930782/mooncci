@@ -7,7 +7,7 @@ type User = {
   id: number;
   username: string;
   email: string;
-  role: 'owner' | 'admin' | 'editor' | 'user';
+  role: 'owner' | 'admin' | 'editor' | 'teacher' | 'user';
   status?: string;
   can_comment?: number;
 };

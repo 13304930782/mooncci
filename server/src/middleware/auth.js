@@ -11,6 +11,10 @@ function isEditorLike(user) {
   return user?.role === 'owner' || user?.role === 'admin' || user?.role === 'editor';
 }
 
+function isVideoReviewerLike(user) {
+  return isEditorLike(user) || user?.role === 'teacher';
+}
+
 function parseCookies(req) {
   const header = req.headers.cookie || '';
   const output = {};
@@ -96,13 +100,23 @@ function editorOrAdmin(req, res, next) {
   next();
 }
 
+function videoReviewerOnly(req, res, next) {
+  if (!isVideoReviewerLike(req.user)) {
+    return res.status(403).json({ message: 'Video review permission is required.' });
+  }
+
+  next();
+}
+
 module.exports = {
   AUTH_COOKIE_NAME,
   authRequired,
   adminOnly,
   editorOrAdmin,
+  videoReviewerOnly,
   getAuthTokenFromRequest,
   getUserFromRequest,
   isAdminLike,
   isEditorLike,
+  isVideoReviewerLike,
 };

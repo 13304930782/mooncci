@@ -47,6 +47,7 @@ function getRoleName(role?: string) {
   if (role === 'owner') return '站长';
   if (role === 'admin') return '管理员';
   if (role === 'editor') return '编辑';
+  if (role === 'teacher') return '老师';
   return '普通用户';
 }
 
@@ -54,6 +55,7 @@ function getRoleBadgeClass(role?: string) {
   if (role === 'owner') return 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-purple-500/30';
   if (role === 'admin') return 'bg-blue-600 text-white shadow-blue-500/30';
   if (role === 'editor') return 'bg-emerald-600 text-white shadow-emerald-500/30';
+  if (role === 'teacher') return 'bg-indigo-600 text-white shadow-indigo-500/30';
   return 'bg-white/10 text-white';
 }
 
@@ -63,6 +65,10 @@ function isManager(role?: string) {
 
 function canWrite(role?: string) {
   return role === 'owner' || role === 'admin' || role === 'editor';
+}
+
+function canReviewVideos(role?: string) {
+  return canWrite(role) || role === 'teacher';
 }
 
 export function AdminShell({ children }: AdminShellProps) {
@@ -78,6 +84,7 @@ export function AdminShell({ children }: AdminShellProps) {
   const role = user?.role || 'user';
   const manager = isManager(role);
   const writer = canWrite(role);
+  const videoReviewer = canReviewVideos(role);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -114,7 +121,7 @@ export function AdminShell({ children }: AdminShellProps) {
       items: [
         { title: '文章管理', to: '/admin/posts', icon: FileText, show: writer },
         { title: '写文章', to: '/admin/write', icon: PenLine, show: writer },
-        { title: '视频评审', to: '/admin/videos', icon: Video, show: writer },
+        { title: '视频评审', to: '/admin/videos', icon: Video, show: videoReviewer },
         { title: '媒体库', to: '/admin/media', icon: Image, show: writer },
       ],
     },
@@ -138,7 +145,7 @@ export function AdminShell({ children }: AdminShellProps) {
         { title: '站点设置', to: '/admin/site-settings', icon: Settings, show: manager },
         { title: '邮件设置', to: '/admin/mail-settings', icon: Mail, show: manager },
         { title: '发送邮件', to: '/admin/send-mail', icon: Send, show: manager },
-        { title: '编辑申请', to: '/admin/editor-apply', icon: ShieldCheck, show: !writer },
+        { title: '编辑申请', to: '/admin/editor-apply', icon: ShieldCheck, show: !writer && role !== 'teacher' },
       ],
     },
   ]

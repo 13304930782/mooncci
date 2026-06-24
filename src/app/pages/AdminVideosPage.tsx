@@ -208,7 +208,10 @@ export default function AdminVideosPage() {
   const [rankingVideoClass, setRankingVideoClass] = useState('');
 
   const editing = useMemo(() => videos.find((item) => item.id === form.id), [videos, form.id]);
-  const manager = user?.role === 'owner' || user?.role === 'admin';
+  const role = user?.role || 'user';
+  const manager = role === 'owner' || role === 'admin';
+  const canManageVideos = manager || role === 'editor';
+  const canReviewVideos = canManageVideos || role === 'teacher';
   const rankingClassSelected = Boolean(rankingVideoClass);
   const rankingExportUrl = useMemo(() => {
     if (!rankingVideoClass) return '#';
@@ -218,7 +221,7 @@ export default function AdminVideosPage() {
   }, [rankingVideoClass]);
 
   const loadRankings = () => {
-    if (!manager) return;
+    if (!canReviewVideos) return;
     if (!rankingVideoClass) {
       setRankings([]);
       setRankingLoading(false);
@@ -244,7 +247,7 @@ export default function AdminVideosPage() {
   useEffect(() => {
     loadVideos();
     loadRankings();
-  }, [manager, rankingVideoClass]);
+  }, [canReviewVideos, rankingVideoClass]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -421,7 +424,7 @@ export default function AdminVideosPage() {
         </div>
       )}
 
-      {manager && (
+      {canReviewVideos && (
         <section className="rounded-3xl bg-white/90 p-6 shadow-lg shadow-black/5">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
             <div>
@@ -517,8 +520,8 @@ export default function AdminVideosPage() {
         </section>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
-        <section className="rounded-3xl bg-white/85 p-6 shadow-lg shadow-black/5">
+      <div className={`grid gap-6 ${canManageVideos ? 'xl:grid-cols-[24rem_minmax(0,1fr)]' : ''}`}>
+        <section className={`${canManageVideos ? '' : 'hidden'} rounded-3xl bg-white/85 p-6 shadow-lg shadow-black/5`}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-bold text-gray-900">{form.id ? '编辑视频' : '新增视频'}</h2>
             {form.id && (
@@ -751,10 +754,10 @@ export default function AdminVideosPage() {
                   </div>
 
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    <button type="button" onClick={() => startEdit(video)} className="rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50">
+                    <button type="button" onClick={() => startEdit(video)} className={`${canManageVideos ? '' : 'hidden'} rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50`}>
                       编辑
                     </button>
-                    <label className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50">
+                    <label className={`${canManageVideos ? 'inline-flex' : 'hidden'} cursor-pointer items-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50`}>
                       <Upload className="h-4 w-4" />
                       {uploadingId === video.id ? '上传中...' : video.source_type === 'local' ? '上传视频' : '上传并切为本地'}
                       <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(event) => handleVideoFile(video.id, event.target.files?.[0])} />
@@ -771,13 +774,13 @@ export default function AdminVideosPage() {
                         嵌入
                       </a>
                     )}
-                    {manager && (
+                    {canReviewVideos && (
                       <button type="button" onClick={() => loadScores(video)} className="inline-flex items-center gap-1 rounded-xl border border-blue-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50">
                         <BarChart3 className="h-4 w-4" />
                         明细
                       </button>
                     )}
-                    <button type="button" onClick={() => removeVideo(video)} className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50">
+                    <button type="button" onClick={() => removeVideo(video)} className={`${canManageVideos ? 'inline-flex' : 'hidden'} items-center gap-1 rounded-xl border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50`}>
                       <Trash2 className="h-4 w-4" />
                       删除
                     </button>

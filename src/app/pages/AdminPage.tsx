@@ -21,6 +21,7 @@ function getRoleName(role?: string) {
   if (role === 'owner') return '站长';
   if (role === 'admin') return '管理员';
   if (role === 'editor') return '编辑';
+  if (role === 'teacher') return '老师';
   return '普通用户';
 }
 
@@ -30,6 +31,10 @@ function isManager(role?: string) {
 
 function canWrite(role?: string) {
   return role === 'owner' || role === 'admin' || role === 'editor';
+}
+
+function canReviewVideos(role?: string) {
+  return canWrite(role) || role === 'teacher';
 }
 
 function getRoleTip(role?: string) {
@@ -45,6 +50,10 @@ function getRoleTip(role?: string) {
     return '你当前是编辑账号，可以写文章，评论无需审核。';
   }
 
+  if (role === 'teacher') {
+    return '你当前是老师账号，只开放视频评审、评分统计、评分明细和导出权限。';
+  }
+
   return '你当前是普通用户，可以评论文章，但暂时不能写文章。想发布文章，请先提交编辑申请。';
 }
 
@@ -54,6 +63,7 @@ export default function AdminPage() {
   const role = user?.role || 'user';
   const manager = isManager(role);
   const writer = canWrite(role);
+  const videoReviewer = canReviewVideos(role);
 
   const [stats, setStats] = useState({
     posts: 0,
@@ -73,7 +83,7 @@ export default function AdminPage() {
           manager ? api('/admin/users') : Promise.resolve([]),
           manager ? api('/admin/comments?status=all') : Promise.resolve([]),
           manager ? api('/admin/banned-words') : Promise.resolve([]),
-          writer ? api('/videos/admin') : Promise.resolve([]),
+          videoReviewer ? api('/videos/admin') : Promise.resolve([]),
         ]);
 
         if (cancelled) return;
@@ -115,7 +125,7 @@ export default function AdminPage() {
       title: '视频总数',
       value: stats.videos,
       icon: Video,
-      show: writer,
+      show: videoReviewer,
     },
     {
       title: '用户总数',
@@ -213,7 +223,7 @@ export default function AdminPage() {
       desc: '提交申请，通过后即可写文章',
       to: '/admin/editor-apply',
       icon: ShieldCheck,
-      show: !writer,
+      show: !writer && role !== 'teacher',
     },
   ].filter((item) => item.show);
 

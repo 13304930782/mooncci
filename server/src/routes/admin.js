@@ -47,7 +47,7 @@ router.put('/users/:id', adminOnly, async (req, res) => {
 
   if (!old) return res.status(404).json({ message: '用户不存在' });
 
-  const nextRole = ['owner', 'admin', 'editor', 'user'].includes(role) ? role : old.role;
+  const nextRole = ['owner', 'admin', 'editor', 'teacher', 'user'].includes(role) ? role : old.role;
   const nextStatus = status === undefined ? old.status : status;
 
   if (!['active', 'disabled'].includes(nextStatus)) {
