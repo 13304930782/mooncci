@@ -533,7 +533,7 @@ export default function AdminVideosPage() {
         </section>
       )}
 
-      <div className={`grid gap-6 ${canManageVideos ? 'xl:grid-cols-[24rem_minmax(0,1fr)]' : ''}`}>
+      <div className={`grid gap-6 ${canManageVideos ? '2xl:grid-cols-[24rem_minmax(0,1fr)]' : ''}`}>
         <section className={`${canManageVideos ? '' : 'hidden'} rounded-3xl bg-white/85 p-6 shadow-lg shadow-black/5`}>
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-bold text-gray-900">{form.id ? '编辑视频' : '新增视频'}</h2>
@@ -741,7 +741,7 @@ export default function AdminVideosPage() {
 
             {videos.map((video) => (
               <div key={video.id} className="rounded-2xl border border-gray-200 bg-white p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-bold text-gray-900">{getVideoDisplayTitle(video)}</h3>
