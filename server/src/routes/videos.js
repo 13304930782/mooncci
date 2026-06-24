@@ -309,6 +309,22 @@ async function ensurePublicScoringSchemaOnce() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS video_admin_logs (
+      id INT NOT NULL AUTO_INCREMENT,
+      user_id INT NULL,
+      username VARCHAR(100) NULL,
+      action VARCHAR(60) NOT NULL,
+      class_code VARCHAR(40) NULL,
+      detail VARCHAR(255) NULL,
+      ip VARCHAR(64) NULL,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_video_admin_logs_created_at (created_at),
+      KEY idx_video_admin_logs_class_code (class_code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   const [userIdColumns] = await db.query(
     `
     SELECT IS_NULLABLE AS nullable
@@ -802,6 +818,20 @@ function buildRankingRows(videos, scoreRows) {
   return rows.map((row) => ({ ...row, rank: null }));
 }
 
+async function writeAdminLog(req, action, classCode, detail) {
+  await db.query(
+    'INSERT INTO video_admin_logs (user_id, username, action, class_code, detail, ip) VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      req.user?.id || null,
+      req.user?.username || null,
+      cleanString(action, 60),
+      classCode || null,
+      cleanString(detail, 255),
+      requestIp(req),
+    ]
+  );
+}
+
 async function fetchAdminVideos(user, filters = {}) {
   const where = [];
   const params = [];
@@ -1104,8 +1134,36 @@ router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req
   }
 });
 
+router.get('/admin/logs', authRequired, videoReviewerOnly, async (req, res) => {
+  try {
+    await ensurePublicScoringSchema();
+    const classCode = cleanClassCode(req.query.class_code || req.query.classCode || req.query.scorer_class_code || req.query.video_class_code);
+    const where = classCode ? 'WHERE class_code=?' : '';
+    const params = classCode ? [classCode] : [];
+    const [rows] = await db.query(
+      `
+      SELECT id, username, action, class_code, detail, ip, created_at
+      FROM video_admin_logs
+      ${where}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 30
+      `,
+      params
+    );
+
+    res.json(rows.map((row) => ({
+      ...row,
+      class_label: classLabel(row.class_code),
+    })));
+  } catch (err) {
+    console.error('[videos/admin/logs]', err);
+    res.status(500).json({ message: '操作日志加载失败' });
+  }
+});
+
 router.post('/admin/class-scoring', authRequired, videoReviewerOnly, async (req, res) => {
   try {
+    await ensurePublicScoringSchema();
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
     if (!classCode) return res.status(400).json({ message: '请选择班级' });
 
@@ -1114,6 +1172,7 @@ router.post('/admin/class-scoring', authRequired, videoReviewerOnly, async (req,
       'UPDATE videos SET public_scoring_enabled=? WHERE class_code=?',
       [enabled, classCode]
     );
+    await writeAdminLog(req, enabled ? 'open_class_scoring' : 'close_class_scoring', classCode, `affected=${result.affectedRows || 0}`);
 
     res.json({ ok: true, class_code: classCode, public_scoring_enabled: enabled, affected: result.affectedRows || 0 });
   } catch (err) {
@@ -1124,6 +1183,7 @@ router.post('/admin/class-scoring', authRequired, videoReviewerOnly, async (req,
 
 router.post('/admin/class-scores/clear', authRequired, adminOnly, async (req, res) => {
   try {
+    await ensurePublicScoringSchema();
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
     if (!classCode) return res.status(400).json({ message: '请选择班级' });
 
@@ -1135,6 +1195,7 @@ router.post('/admin/class-scores/clear', authRequired, adminOnly, async (req, re
       `,
       [classCode]
     );
+    await writeAdminLog(req, 'clear_class_scores', classCode, `deleted=${result.affectedRows || 0}`);
 
     res.json({ ok: true, class_code: classCode, deleted: result.affectedRows || 0 });
   } catch (err) {

@@ -55,6 +55,16 @@ type ScoreRow = {
   updated_at?: string;
 };
 
+type AdminLogRow = {
+  id: number;
+  username?: string;
+  action: string;
+  class_code?: string;
+  class_label?: string;
+  detail?: string;
+  ip?: string;
+  created_at?: string;
+};
 
 type RankingRow = {
   rank: number | null;
@@ -157,6 +167,13 @@ function getVideoDisplayTitle(video: { team_name?: string; title: string }) {
   return video.title;
 }
 
+function logActionLabel(action: string) {
+  if (action === 'open_class_scoring') return '开放评分';
+  if (action === 'close_class_scoring') return '停止评分';
+  if (action === 'clear_class_scores') return '清空评分';
+  return action;
+}
+
 async function uploadVideo(videoId: number, file: File) {
   const formData = new FormData();
   formData.append('video', file);
@@ -204,6 +221,7 @@ export default function AdminVideosPage() {
   const [scoreVideo, setScoreVideo] = useState<VideoRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [rankings, setRankings] = useState<RankingRow[]>([]);
+  const [adminLogs, setAdminLogs] = useState<AdminLogRow[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingVideoClass, setRankingVideoClass] = useState('');
   const [videoListClass, setVideoListClass] = useState('');
@@ -243,11 +261,24 @@ export default function AdminVideosPage() {
 
     return `当前将导出：${classLabel}，第1组到第${maxGroupNumber}组，共 ${scoreCount} 条评分记录；没有数据的组会留空。`;
   }, [rankingVideoClass, rankings]);
+  const progressSummary = useMemo(() => {
+    const groups = rankings.map((row) => ({
+      name: getDisplayTeamName(row.team_name) || '未填写组号',
+      scoreCount: Number(row.score_count || 0),
+    }));
+
+    return {
+      total: groups.length,
+      done: groups.filter((item) => item.scoreCount > 0).length,
+      empty: groups.filter((item) => item.scoreCount === 0),
+    };
+  }, [rankings]);
 
   const loadRankings = () => {
     if (!canReviewVideos) return;
     if (!rankingVideoClass) {
       setRankings([]);
+      setAdminLogs([]);
       setRankingLoading(false);
       return;
     }
@@ -260,6 +291,10 @@ export default function AdminVideosPage() {
       .then((rows) => setRankings(Array.isArray(rows) ? rows : []))
       .catch((err) => showAppToast(err.message || '评分数据加载失败'))
       .finally(() => setRankingLoading(false));
+
+    api(`/videos/admin/logs${query.toString() ? `?${query.toString()}` : ''}`)
+      .then((rows) => setAdminLogs(Array.isArray(rows) ? rows : []))
+      .catch(() => setAdminLogs([]));
   };
 
   const loadVideos = () => {
@@ -602,6 +637,33 @@ export default function AdminVideosPage() {
           }`}>
             {exportPreview}
           </div>
+          {rankingClassSelected && (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                <div className="text-sm font-bold text-gray-900">评分进度</div>
+                <div className="mt-2 text-sm text-gray-600">
+                  已有评分：{progressSummary.done} / {progressSummary.total} 组
+                </div>
+                <div className="mt-2 text-xs leading-5 text-gray-500">
+                  {progressSummary.empty.length
+                    ? `未收到评分：${progressSummary.empty.map((item) => item.name).join('、')}`
+                    : '所有视频都已有评分。'}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-gray-100 bg-white px-4 py-3">
+                <div className="text-sm font-bold text-gray-900">最近操作</div>
+                <div className="mt-2 space-y-2 text-xs leading-5 text-gray-500">
+                  {adminLogs.slice(0, 5).map((log) => (
+                    <div key={log.id} className="flex justify-between gap-3">
+                      <span>{logActionLabel(log.action)} · {log.username || '未知用户'}</span>
+                      <span className="shrink-0">{log.created_at ? new Date(log.created_at).toLocaleString('zh-CN', { hour12: false }) : '-'}</span>
+                    </div>
+                  ))}
+                  {adminLogs.length === 0 && <div>暂无操作记录。</div>}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
