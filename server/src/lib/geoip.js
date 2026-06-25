@@ -76,6 +76,52 @@ const chinaRegionMap = {
   82: '澳门',
 };
 
+const chinaRegionAliasMap = {
+  BJ: '北京',
+  TJ: '天津',
+  HE: '河北',
+  SX: '山西',
+  NM: '内蒙古',
+  LN: '辽宁',
+  JL: '吉林',
+  HL: '黑龙江',
+  SH: '上海',
+  JS: '江苏',
+  ZJ: '浙江',
+  AH: '安徽',
+  FJ: '福建',
+  JX: '江西',
+  SD: '山东',
+  HA: '河南',
+  HB: '湖北',
+  HN: '湖南',
+  GD: '广东',
+  GX: '广西',
+  HI: '海南',
+  CQ: '重庆',
+  SC: '四川',
+  GZ: '贵州',
+  YN: '云南',
+  XZ: '西藏',
+  SN: '陕西',
+  GS: '甘肃',
+  QH: '青海',
+  NX: '宁夏',
+  XJ: '新疆',
+};
+
+function normalizeIpLocation(value) {
+  const text = String(value || '').trim();
+  if (!text) return text;
+
+  const parts = text.split('/').map((part) => part.trim());
+  if (parts.length >= 2 && chinaRegionAliasMap[parts[0]]) {
+    return `${chinaRegionAliasMap[parts[0]]} / ${parts.slice(1).join(' / ')}`;
+  }
+
+  return chinaRegionAliasMap[text] || text;
+}
+
 function getIpLocation(ip) {
   if (!ip) return '未知地区';
 
@@ -111,7 +157,7 @@ function getIpLocation(ip) {
   const country = countryMap[info.country] || info.country || '未知国家';
 
   if (info.country === 'CN') {
-    const region = chinaRegionMap[info.region] || info.region || '';
+    const region = chinaRegionMap[info.region] || chinaRegionAliasMap[info.region] || info.region || '';
     return region ? `${region} / ${country}` : country;
   }
 
@@ -126,4 +172,5 @@ function getIpLocation(ip) {
 
 module.exports = {
   getIpLocation,
+  normalizeIpLocation,
 };

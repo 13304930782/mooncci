@@ -1,7 +1,10 @@
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const { authRequired, adminOnly, editorOrAdmin, isAdminLike } = require('../middleware/auth');
-const { sendCommentReviewNotification } = require('../lib/mailer');
+const { sendCommentReviewNotification, sendMail, getMailConfig } = require('../lib/mailer');
+const { normalizeIpLocation } = require('../lib/geoip');
+const { ensureBannedIpsTable } = require('../lib/ipBan');
 
 const router = express.Router();
 
@@ -20,6 +23,56 @@ function maskIp(ip) {
   return '';
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sha256(input) {
+  return crypto.createHash('sha256').update(input).digest('hex');
+}
+
+function safeSiteUrl(value) {
+  const fallback = 'https://mooncci.site';
+  try {
+    const parsed = new URL(String(value || fallback).trim());
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.origin : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function sendPasswordResetToUser(user) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = sha256(rawToken);
+
+  await db.query('DELETE FROM password_resets WHERE user_id=? AND used_at IS NULL', [user.id]);
+  await db.query(
+    'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))',
+    [user.id, tokenHash]
+  );
+
+  const config = await getMailConfig();
+  const resetUrl = `${safeSiteUrl(config.site_url || process.env.SITE_URL)}/reset-password?token=${rawToken}`;
+
+  await sendMail({
+    to: user.email,
+    subject: '[Mooncci] 密码重置链接',
+    text: `请在 30 分钟内使用这个链接重置密码：\n\n${resetUrl}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.8;color:#111827;">
+        <h2>密码重置</h2>
+        <p>${escapeHtml(user.username || user.email)}，管理员为你发送了密码重置链接，有效期 30 分钟。</p>
+        <p><a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;">重置密码</a></p>
+      </div>
+    `,
+  });
+}
+
 
 
 router.use(authRequired);
@@ -34,13 +87,55 @@ function isSameUser(a, b) {
 
 router.get('/users', adminOnly, async (_req, res) => {
   const [rows] = await db.query(
-    'SELECT id,username,email,role,status,can_comment,created_at FROM users ORDER BY id DESC'
+    `
+    SELECT
+      u.id,u.username,u.email,u.role,u.status,u.can_comment,u.created_at,
+      (
+        SELECT c.ip_address FROM comments c
+        WHERE c.user_id=u.id
+        ORDER BY c.created_at DESC
+        LIMIT 1
+      ) AS last_ip,
+      (
+        SELECT c.ip_location FROM comments c
+        WHERE c.user_id=u.id
+        ORDER BY c.created_at DESC
+        LIMIT 1
+      ) AS last_ip_location
+    FROM users u
+    ORDER BY u.id DESC
+    `
   );
-  res.json(rows);
+  res.json(rows.map((row) => ({
+    ...row,
+    last_ip_masked: maskIp(row.last_ip),
+    last_ip_location: normalizeIpLocation(row.last_ip_location),
+  })));
+});
+
+router.get('/users/:id/activity', adminOnly, async (req, res) => {
+  const [rows] = await db.query(
+    `
+    SELECT c.id,c.content,c.status,c.ip_address,c.ip_location,c.created_at,p.title AS post_title
+    FROM comments c
+    JOIN posts p ON p.id=c.post_id
+    WHERE c.user_id=?
+    ORDER BY c.created_at DESC
+    LIMIT 10
+    `,
+    [req.params.id]
+  );
+
+  res.json(rows.map((row) => ({
+    ...row,
+    ip_address_masked: maskIp(row.ip_address),
+    ip_location: normalizeIpLocation(row.ip_location),
+  })));
 });
 
 router.put('/users/:id', adminOnly, async (req, res) => {
   const { role, status, can_comment } = req.body;
+  const username = String(req.body.username || '').trim();
 
   const [oldRows] = await db.query('SELECT * FROM users WHERE id=? LIMIT 1', [req.params.id]);
   const old = oldRows[0];
@@ -77,12 +172,56 @@ router.put('/users/:id', adminOnly, async (req, res) => {
     return res.status(400).json({ message: 'You cannot disable your own account' });
   }
 
+  const nextUsername = username || old.username;
+  if (nextUsername.length < 2 || nextUsername.length > 50) {
+    return res.status(400).json({ message: '用户名长度需要在 2 到 50 个字符之间' });
+  }
+
+  if (nextUsername !== old.username) {
+    const [sameRows] = await db.query('SELECT id FROM users WHERE username=? AND id<>? LIMIT 1', [nextUsername, old.id]);
+    if (sameRows[0]) return res.status(409).json({ message: '用户名已被占用' });
+  }
+
   await db.query(
-    'UPDATE users SET role=?, status=?, can_comment=? WHERE id=?',
-    [nextRole, nextStatus, nextCanComment, req.params.id]
+    'UPDATE users SET username=?, role=?, status=?, can_comment=? WHERE id=?',
+    [nextUsername, nextRole, nextStatus, nextCanComment, req.params.id]
   );
 
+  if (nextUsername !== old.username) {
+    await sendMail({
+      to: old.email,
+      subject: '[Mooncci] 用户名已更新',
+      text: `你的用户名已由 ${old.username} 修改为 ${nextUsername}。`,
+      html: `<p>你的用户名已由 <strong>${escapeHtml(old.username)}</strong> 修改为 <strong>${escapeHtml(nextUsername)}</strong>。</p>`,
+    });
+  }
+
   res.json({ message: '更新成功' });
+});
+
+router.post('/users/:id/reset-password', adminOnly, async (req, res) => {
+  const [rows] = await db.query('SELECT id, username, email, role FROM users WHERE id=? LIMIT 1', [req.params.id]);
+  const user = rows[0];
+  if (!user) return res.status(404).json({ message: '用户不存在' });
+  if (user.role === 'owner' && !isOwner(req.user)) {
+    return res.status(403).json({ message: 'Only owner can reset owner account password' });
+  }
+
+  await sendPasswordResetToUser(user);
+  res.json({ message: '密码重置链接已发送' });
+});
+
+router.post('/banned-ips', adminOnly, async (req, res) => {
+  const ip = String(req.body.ip_address || req.body.ip || '').trim().replace('::ffff:', '');
+  if (!ip) return res.status(400).json({ message: 'IP 不能为空' });
+
+  await ensureBannedIpsTable();
+  await db.query(
+    'INSERT IGNORE INTO banned_ips (ip_address, reason, created_by) VALUES (?, ?, ?)',
+    [ip, String(req.body.reason || '').trim().slice(0, 255) || null, req.user.id]
+  );
+
+  res.json({ message: 'IP 已屏蔽' });
 });
 
 router.delete('/users/:id', adminOnly, async (req, res) => {
@@ -203,6 +342,7 @@ router.get('/comments', adminOnly, async (req, res) => {
 
   res.json(rows.map((row) => ({
     ...row,
+    ip_location: normalizeIpLocation(row.ip_location),
     ip_address_masked: maskIp(row.ip_address),
     ip_address: req.user.role === 'owner' ? row.ip_address : undefined,
   })));

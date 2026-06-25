@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { AUTH_COOKIE_NAME, authRequired } = require('../middleware/auth');
 const { sendMail, getMailConfig } = require('../lib/mailer');
+const { isIpBanned } = require('../lib/ipBan');
 
 const router = express.Router();
 
@@ -167,6 +168,10 @@ function safeSiteUrl(value) {
 
 router.post('/register', authRateLimit({ name: 'register', windowMs: 60 * 60 * 1000, max: 8 }), async (req, res) => {
   try {
+    if (await isIpBanned(getClientIp(req))) {
+      return res.status(403).json({ message: '该 IP 已被屏蔽，无法注册。' });
+    }
+
     const username = String(req.body.username || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -220,6 +225,10 @@ router.post('/register', authRateLimit({ name: 'register', windowMs: 60 * 60 * 1
 
 router.post('/login', authRateLimit({ name: 'login', windowMs: 15 * 60 * 1000, max: 10, includeEmail: true }), async (req, res) => {
   try {
+    if (await isIpBanned(getClientIp(req))) {
+      return res.status(403).json({ message: '该 IP 已被屏蔽，无法登录。' });
+    }
+
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
 

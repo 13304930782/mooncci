@@ -2,7 +2,8 @@ const express = require('express');
 const db = require('../db');
 const { authRequired, getUserFromRequest } = require('../middleware/auth');
 const { sendCommentNotification } = require('../lib/mailer');
-const { getIpLocation } = require('../lib/geoip');
+const { getIpLocation, normalizeIpLocation } = require('../lib/geoip');
+const { isIpBanned } = require('../lib/ipBan');
 
 const router = express.Router();
 
@@ -181,6 +182,7 @@ router.get('/post/:postId', async (req, res) => {
         liked_by_me: Boolean(row.liked_by_me),
         like_count: Number(row.like_count || 0),
         status_text,
+        ip_location: normalizeIpLocation(row.ip_location),
         ip_address_masked: maskIp(row.ip_address),
         ip_address: undefined,
       };
@@ -297,6 +299,10 @@ router.post('/post/:postId', authRequired, async (req, res) => {
     }
 
     const ip = getClientIp(req);
+    if (await isIpBanned(ip)) {
+      return res.status(403).json({ message: '该 IP 已被屏蔽，无法发表评论。' });
+    }
+
     const userAgent = req.headers['user-agent'] || '';
     const ipLocation = getIpLocation(ip);
 
