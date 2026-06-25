@@ -479,11 +479,17 @@ function normalizeDirectUrl(value) {
   return url.toString().slice(0, 800);
 }
 
+function sourceProviderMatches(row, providerName) {
+  const provider = String(row.provider || '').toLowerCase();
+  const embedUrl = String(row.embed_url || '').toLowerCase();
+  return provider.includes(providerName) || embedUrl.includes(providerName);
+}
+
 function sourceLabel(row) {
   const type = cleanSourceType(row.source_type);
   if (type === 'embed') {
-    if (row.provider === 'youtube') return 'YouTube 嵌入';
-    if (row.provider === 'bilibili') return 'B站嵌入';
+    if (sourceProviderMatches(row, 'youtube')) return 'YouTube 嵌入';
+    if (sourceProviderMatches(row, 'bilibili')) return 'B站嵌入';
     return '第三方嵌入';
   }
   if (type === 'direct') return '外部直链';

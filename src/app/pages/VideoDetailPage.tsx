@@ -136,11 +136,16 @@ function formatDateTime(value?: string) {
   return date.toLocaleString('zh-CN', { hour12: false });
 }
 
+function sourceProviderMatches(video: VideoDetail, providerName: string) {
+  return String(video.provider || '').toLowerCase().includes(providerName)
+    || String(video.embed_url || '').toLowerCase().includes(providerName);
+}
+
 function getSourceLabel(video: VideoDetail) {
   if (video.source_label) return video.source_label;
   if (video.source_type === 'embed') {
-    if (video.provider === 'youtube') return 'YouTube 嵌入';
-    if (video.provider === 'bilibili') return 'B站嵌入';
+    if (sourceProviderMatches(video, 'youtube')) return 'YouTube 嵌入';
+    if (sourceProviderMatches(video, 'bilibili')) return 'B站嵌入';
     return '第三方嵌入';
   }
   if (video.source_type === 'direct') return '外部直链';
