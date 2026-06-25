@@ -95,9 +95,12 @@ function requireRequestedWith(req, res, next) {
 }
 
 // 全局限流
+const apiRateLimitWindowMs = Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000);
+const apiRateLimitMax = Number(process.env.API_RATE_LIMIT_MAX || 2000);
+
 const globalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 200,
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: '请求过于频繁，请稍后重试' },

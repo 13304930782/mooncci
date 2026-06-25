@@ -1,4 +1,7 @@
 const geoip = require('geoip-lite');
+const IP2Region = require('ip2region').default || require('ip2region');
+
+const ip2region = new IP2Region();
 
 
 const cityMap = {
@@ -116,10 +119,43 @@ function normalizeIpLocation(value) {
 
   const parts = text.split('/').map((part) => part.trim());
   if (parts.length >= 2 && chinaRegionAliasMap[parts[0]]) {
-    return `${chinaRegionAliasMap[parts[0]]} / ${parts.slice(1).join(' / ')}`;
+    return chinaRegionAliasMap[parts[0]];
+  }
+
+  if (parts.length >= 2 && (parts[1] === '中国' || parts[1] === 'CN')) {
+    return parts[0];
+  }
+
+  const chinaTextMatch = text.match(/^中国\s+([^\s省市自治区特别行政区]+)(?:省|市|自治区|壮族自治区|回族自治区|维吾尔自治区|特别行政区)?/);
+  if (chinaTextMatch) {
+    return chinaTextMatch[1];
   }
 
   return chinaRegionAliasMap[text] || text;
+}
+
+function stripChinaProvinceSuffix(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  return text
+    .replace(/壮族自治区|回族自治区|维吾尔自治区|自治区|特别行政区|省|市$/g, '')
+    .trim();
+}
+
+function lookupProvinceWithIp2Region(ip) {
+  try {
+    const info = ip2region.search(ip);
+    if (!info) return '';
+
+    if (info.country === '中国') {
+      return stripChinaProvinceSuffix(info.province) || '中国';
+    }
+
+    return info.country || '';
+  } catch {
+    return '';
+  }
 }
 
 function getIpLocation(ip) {
@@ -150,6 +186,9 @@ function getIpLocation(ip) {
     return '本地网络';
   }
 
+  const ip2RegionLocation = lookupProvinceWithIp2Region(ip);
+  if (ip2RegionLocation) return ip2RegionLocation;
+
   const info = geoip.lookup(ip);
 
   if (!info) return '未知地区';
@@ -158,7 +197,7 @@ function getIpLocation(ip) {
 
   if (info.country === 'CN') {
     const region = chinaRegionMap[info.region] || chinaRegionAliasMap[info.region] || info.region || '';
-    return region ? `${region} / ${country}` : country;
+    return region || country;
   }
 
   const city = cityMap[info.city] || info.city || '';
