@@ -51,6 +51,17 @@ function getGroupNumber(teamName?: string) {
   return String(teamName || '').match(/\d+/)?.[0] || '';
 }
 
+function sortVideosByGroup(videos: VideoItem[]) {
+  return [...videos].sort((a, b) => {
+    const groupA = Number(getGroupNumber(a.team_name));
+    const groupB = Number(getGroupNumber(b.team_name));
+    const safeGroupA = Number.isFinite(groupA) && groupA > 0 ? groupA : Number.MAX_SAFE_INTEGER;
+    const safeGroupB = Number.isFinite(groupB) && groupB > 0 ? groupB : Number.MAX_SAFE_INTEGER;
+    if (safeGroupA !== safeGroupB) return safeGroupA - safeGroupB;
+    return a.id - b.id;
+  });
+}
+
 function getDisplayTeamName(teamName?: string) {
   const groupNumber = getGroupNumber(teamName);
   if (groupNumber) return `第${groupNumber}组`;
@@ -86,7 +97,7 @@ export default function VideosPage() {
 
     setLoading(true);
     api(`/videos${query}`)
-      .then((rows) => setVideos(Array.isArray(rows) ? rows : []))
+      .then((rows) => setVideos(Array.isArray(rows) ? sortVideosByGroup(rows) : []))
       .catch((err) => showAppToast(err.message || '视频加载失败'))
       .finally(() => setLoading(false));
   }, [selectedClassCode]);
