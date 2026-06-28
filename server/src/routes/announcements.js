@@ -66,6 +66,37 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/:id(\\d+)', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ message: '公告 ID 无效。' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT id, title, content, link_label, link_url, pinned, published_at, created_at, updated_at
+      FROM announcements
+      WHERE id=? AND status='published'
+      LIMIT 1
+      `,
+      [id]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ message: '公告不存在。' });
+    }
+
+    res.json(publicRow(rows[0]));
+  } catch (err) {
+    if (err?.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(404).json({ message: '公告不存在。' });
+    }
+
+    throw err;
+  }
+});
+
 router.get('/admin', authRequired, adminOnly, async (req, res) => {
   const status = cleanString(req.query.status, 'all', 20);
   const params = [];

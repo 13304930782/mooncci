@@ -29,7 +29,7 @@ const emptyForm: FormState = {
   title: '',
   content: '',
   link_label: '查看详情',
-  link_url: '/articles',
+  link_url: '',
   status: 'draft',
   pinned: false,
 };
@@ -204,7 +204,7 @@ export default function AdminAnnouncementsPage() {
             <input
               value={form.link_url}
               onChange={(event) => update('link_url', event.target.value)}
-              placeholder="/articles"
+              placeholder="可留空；外部链接才填写 https://..."
               className="mt-2 w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
           </label>

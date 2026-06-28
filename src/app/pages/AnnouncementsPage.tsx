@@ -36,14 +36,13 @@ function isExternalLink(url?: string) {
 
 function AnnouncementAction({ item }: { item: Announcement }) {
   const url = item.link_url?.trim();
+  const detailUrl = `/announcements/${item.id}`;
   const label = item.link_label?.trim() || '查看详情';
-
-  if (!url) return null;
 
   const className =
     'inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors duration-300 hover:border-blue-300 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300';
 
-  if (isExternalLink(url)) {
+  if (url && isExternalLink(url)) {
     return (
       <a href={url} target="_blank" rel="noreferrer" className={className}>
         {label}
@@ -53,7 +52,7 @@ function AnnouncementAction({ item }: { item: Announcement }) {
   }
 
   return (
-    <Link to={url} className={className}>
+    <Link to={detailUrl} className={className}>
       {label}
       <ArrowRight className="h-4 w-4" />
     </Link>
