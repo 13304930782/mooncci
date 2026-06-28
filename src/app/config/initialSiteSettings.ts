@@ -27,6 +27,7 @@ export const initialSiteSettings = {
   },
   "footer": {
     "copyright": "Copyright mooncci in LNTU",
+    "brand_text": "个人博客与班级答辩视频评审平台。",
     "icp_text": " 辽ICP备2024042989号-2",
     "icp_url": "https://beian.miit.gov.cn/",
     "police_text": "辽公网安备21041102000446号",

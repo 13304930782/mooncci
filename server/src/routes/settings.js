@@ -37,6 +37,7 @@ const defaultHero = {
 
 const defaultFooter = {
   copyright: 'Copyright mooncci',
+  brand_text: '个人博客与班级答辩视频评审平台。',
   icp_text: '',
   icp_url: 'https://beian.miit.gov.cn/',
   police_text: '',

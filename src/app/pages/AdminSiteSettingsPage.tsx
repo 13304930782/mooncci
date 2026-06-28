@@ -24,6 +24,7 @@ const defaultProfile = {
 
 const defaultFooter = {
   copyright: '',
+  brand_text: '',
   icp_text: '',
   icp_url: '',
   police_text: '',
@@ -318,6 +319,16 @@ export default function AdminSiteSettingsPage() {
                 onChange={(e) => updateFooter('copyright', e.target.value)}
                 className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Copyright mooncci in LNTU"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block mb-2 text-sm font-medium text-gray-700">页脚品牌说明</label>
+              <input
+                value={footer.brand_text}
+                onChange={(e) => updateFooter('brand_text', e.target.value)}
+                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="个人博客与班级答辩视频评审平台。"
               />
             </div>
 
