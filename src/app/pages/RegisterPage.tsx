@@ -66,7 +66,7 @@ export default function RegisterPage() {
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg">
                 <Sparkles className="w-5 h-5" />
               </div>
-              <span className="text-xl font-semibold">Mooncci Blog</span>
+              <span className="text-xl font-semibold">mooncci Blog</span>
             </Link>
 
             <h1 className="mt-16 text-5xl font-bold leading-tight">

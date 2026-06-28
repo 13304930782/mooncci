@@ -108,11 +108,11 @@ export default function ArticlePage() {
         dateModified: modifiedTime,
         author: {
           '@type': 'Person',
-          name: post.author_name || 'Mooncci',
+          name: post.author_name || 'mooncci',
         },
         publisher: {
           '@type': 'Organization',
-          name: 'Mooncci Blog',
+          name: 'mooncci Blog',
           url: SITE_URL,
         },
         mainEntityOfPage: {

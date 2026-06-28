@@ -179,7 +179,7 @@ export default function AdminMailSettingsPage() {
                   value={mail.smtp_from}
                   onChange={(e) => update('smtp_from', e.target.value)}
                   className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Mooncci Blog <websiteaccount@mooncci.site>"
+                  placeholder="mooncci Blog <websiteaccount@mooncci.site>"
                 />
               </div>
 

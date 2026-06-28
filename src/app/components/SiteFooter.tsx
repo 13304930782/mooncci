@@ -5,12 +5,17 @@ import { initialSiteSettings } from '../config/initialSiteSettings';
 import { safeHref, safeImageSrc } from '../lib/safeUrl';
 
 const defaultFooter = {
-  copyright: 'Copyright Mooncci Blog',
+  copyright: 'Copyright mooncci Blog',
   icp_text: '',
   icp_url: 'https://beian.miit.gov.cn/',
   police_text: '',
   police_url: '',
   police_icon_url: '',
+};
+
+const defaultBrand = {
+  nav_title: 'mooncci Blog',
+  logo_url: '',
 };
 
 const quickLinks = [
@@ -24,13 +29,18 @@ const quickLinks = [
 
 export function SiteFooter() {
   const [footer, setFooter] = useState({ ...defaultFooter, ...(initialSiteSettings.footer || {}) });
+  const [brand, setBrand] = useState({ ...defaultBrand, ...(initialSiteSettings.brand || {}) });
   const icpUrl = safeHref(footer.icp_url || defaultFooter.icp_url, defaultFooter.icp_url);
   const policeUrl = safeHref(footer.police_url || '', '');
   const policeIconUrl = safeImageSrc(footer.police_icon_url);
+  const logoUrl = safeImageSrc(brand.logo_url);
 
   useEffect(() => {
     api('/settings/site')
-      .then((data) => setFooter({ ...defaultFooter, ...(data.footer || {}) }))
+      .then((data) => {
+        setFooter({ ...defaultFooter, ...(data.footer || {}) });
+        setBrand({ ...defaultBrand, ...(data.brand || {}) });
+      })
       .catch(() => {});
   }, []);
 
@@ -40,10 +50,14 @@ export function SiteFooter() {
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600">
-              <div className="flex h-full w-full items-center justify-center text-sm font-black text-white">M</div>
+              {logoUrl ? (
+                <img src={logoUrl} alt={brand.nav_title || 'mooncci'} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm font-black text-white">m</div>
+              )}
             </div>
             <p className="mt-3 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-              Mooncci Blog — 个人博客与班级答辩视频评审平台。
+              {brand.nav_title || 'mooncci Blog'} — 个人博客与班级答辩视频评审平台。
             </p>
           </div>
 

@@ -67,7 +67,7 @@ export const defaultHomeTopics: HomeTopic[] = [
 
 export const defaultHomeSettings: HomeSettings = {
   hero_eyebrow: 'Software Engineering Notes',
-  hero_title: 'Mooncci Blog',
+  hero_title: 'mooncci Blog',
   hero_subtitle: '记录 Web 开发、Linux、OpenWrt、网络技术、系统设计和项目实践中的经验与踩坑。',
   hero_description: '这里是一份长期积累的工程笔记：从前端界面、后端接口、数据库、部署排障，到路由器和网络监控，把真正踩过的坑写清楚。',
   primary_cta_label: '开始阅读',
@@ -86,7 +86,7 @@ export const defaultHomeSettings: HomeSettings = {
   topics: defaultHomeTopics,
   about_eyebrow: 'About',
   about_title: '关于作者',
-  about_intro: '我是 Mooncci，一名软件工程学生，也是在持续补齐工程能力的全栈开发学习者。',
+  about_intro: '我是 mooncci，一名软件工程学生，也是在持续补齐工程能力的全栈开发学习者。',
   about_description: '目前主要关注 Web 开发、网络、系统部署、数据库设计和项目实践。这个博客会尽量把“为什么这么做”“哪里容易坏”“怎么验证”写清楚。',
   about_email: 'websiteaccount@mooncci.site',
   about_github: 'https://github.com/',

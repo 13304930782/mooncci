@@ -55,13 +55,13 @@ export default function LoginPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-500">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <span className="font-semibold">Mooncci Blog</span>
+              <span className="font-semibold">mooncci Blog</span>
             </div>
 
             <h1 className="mt-14 max-w-xl text-[clamp(2.2rem,4.6vw,4.5rem)] font-black leading-[1.08] tracking-tight">
               欢迎来到
               <br />
-              Mooncci Blog
+              mooncci Blog
             </h1>
 
             <p className="mt-7 max-w-lg text-base leading-8 text-white/82 md:text-lg">

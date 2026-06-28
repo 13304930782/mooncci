@@ -10,8 +10,8 @@ import { safeImageSrc } from '../lib/safeUrl';
 import { fadeUp, fadeUpWithDelay } from '../lib/animations';
 
 const defaultBrand = {
-  site_title: 'Mooncci Blog',
-  nav_title: 'Mooncci Blog',
+  site_title: 'mooncci Blog',
+  nav_title: 'mooncci Blog',
   logo_url: '',
   favicon_url: '',
 };
@@ -285,7 +285,7 @@ export function Header() {
                   )}
                 </div>
                 <span className="truncate text-lg font-black tracking-[-0.02em] text-slate-950 dark:text-white">
-                  {brand.nav_title || 'Mooncci Blog'}
+                  {brand.nav_title || 'mooncci Blog'}
                 </span>
               </Link>
 

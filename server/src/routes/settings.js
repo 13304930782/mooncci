@@ -7,8 +7,8 @@ const router = express.Router();
 const CUSTOM_MAIL_DAILY_LIMIT = Number(process.env.CUSTOM_MAIL_DAILY_LIMIT || 20);
 
 const defaultBrand = {
-  site_title: 'Mooncci Blog',
-  nav_title: 'Mooncci Blog',
+  site_title: 'mooncci Blog',
+  nav_title: 'mooncci Blog',
   logo_url: '',
   favicon_url: '',
 };
@@ -36,7 +36,7 @@ const defaultHero = {
 };
 
 const defaultFooter = {
-  copyright: 'Copyright Mooncci',
+  copyright: 'Copyright mooncci',
   icp_text: '',
   icp_url: 'https://beian.miit.gov.cn/',
   police_text: '',
@@ -284,11 +284,11 @@ router.post('/mail/test', authRequired, adminOnly, async (_req, res) => {
 
   await sendMail({
     to: config.notify_to,
-    subject: '[Mooncci] Mail notification test',
-    text: 'This is a test email from Mooncci Blog. If you receive it, mail notifications are configured correctly.',
+    subject: '[mooncci] Mail notification test',
+    text: 'This is a test email from mooncci Blog. If you receive it, mail notifications are configured correctly.',
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.8; color: #111827;">
-        <h2>Mooncci Blog mail notification test</h2>
+        <h2>mooncci Blog mail notification test</h2>
         <p>If you receive this email, mail notifications are configured correctly.</p>
         <p>Future pending comments can send review notifications to this mailbox.</p>
       </div>

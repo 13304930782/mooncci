@@ -340,13 +340,13 @@ router.post('/forgot-password', authRateLimit({ name: 'forgot-password', windowM
 
     await sendMail({
       to: user.email,
-      subject: '[Mooncci] Reset your password',
-      text: `You requested to reset your Mooncci Blog password. This link is valid for 30 minutes:\n\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
+      subject: '[mooncci] Reset your password',
+      text: `You requested to reset your mooncci Blog password. This link is valid for 30 minutes:\n\n${resetUrl}\n\nIf you did not request this, you can ignore this email.`,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.8; color: #111827;">
           <h2>Reset your password</h2>
           <p>Hello, ${displayName}.</p>
-          <p>You requested to reset your Mooncci Blog password. This link is valid for 30 minutes.</p>
+          <p>You requested to reset your mooncci Blog password. This link is valid for 30 minutes.</p>
           <p>
             <a href="${htmlResetUrl}" style="display:inline-block;background:#2563eb;color:white;padding:10px 18px;border-radius:999px;text-decoration:none;">
               Reset password

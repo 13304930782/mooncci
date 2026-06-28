@@ -61,7 +61,7 @@ async function sendPasswordResetToUser(user) {
 
   await sendMail({
     to: user.email,
-    subject: '[Mooncci] 密码重置链接',
+    subject: '[mooncci] 密码重置链接',
     text: `请在 30 分钟内使用这个链接重置密码：\n\n${resetUrl}`,
     html: `
       <div style="font-family:Arial,sans-serif;line-height:1.8;color:#111827;">
@@ -190,7 +190,7 @@ router.put('/users/:id', adminOnly, async (req, res) => {
   if (nextUsername !== old.username) {
     await sendMail({
       to: old.email,
-      subject: '[Mooncci] 用户名已更新',
+      subject: '[mooncci] 用户名已更新',
       text: `你的用户名已由 ${old.username} 修改为 ${nextUsername}。`,
       html: `<p>你的用户名已由 <strong>${escapeHtml(old.username)}</strong> 修改为 <strong>${escapeHtml(nextUsername)}</strong>。</p>`,
     });

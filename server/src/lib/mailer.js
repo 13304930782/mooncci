@@ -163,7 +163,7 @@ ${adminUrl}
 
   await sendMail({
     to: config.notify_to,
-    subject: `[Mooncci] New comment pending review: ${postTitle}`,
+    subject: `[mooncci] New comment pending review: ${postTitle}`,
     text,
     html,
   });
@@ -189,8 +189,8 @@ async function sendCommentReviewNotification(comment, status) {
     ? 'approved and visible'
     : 'rejected and not visible';
   const subject = passed
-    ? '[Mooncci] Your comment was approved'
-    : '[Mooncci] Your comment was rejected';
+    ? '[mooncci] Your comment was approved'
+    : '[mooncci] Your comment was rejected';
 
   const text = `
 Your comment was ${resultText}.

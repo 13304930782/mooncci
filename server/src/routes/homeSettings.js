@@ -58,7 +58,7 @@ const defaultHomeSettings = {
   ],
   about_eyebrow: 'About',
   about_title: '关于作者',
-  about_intro: '我是 Mooncci，一名软件工程学生，也是在持续补齐工程能力的全栈开发学习者。',
+  about_intro: '我是 mooncci，一名软件工程学生，也是在持续补齐工程能力的全栈开发学习者。',
   about_description:
     '目前主要关注 Web 开发、网络、系统部署、数据库设计和项目实践。这个博客会尽量把“为什么这么做”“哪里容易坏”“怎么验证”写清楚。',
   about_email: 'websiteaccount@mooncci.site',

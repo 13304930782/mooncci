@@ -232,7 +232,7 @@ export default function AdminPage() {
       <section className="rounded-[2rem] bg-gradient-to-br from-gray-950 via-purple-950 to-blue-950 p-8 text-white shadow-xl">
         <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm">
           {role === 'owner' ? <Crown className="h-4 w-4 text-yellow-300" /> : <ShieldCheck className="h-4 w-4" />}
-          Mooncci Control Center
+          mooncci Control Center
         </div>
 
         <h1 className="mt-6 text-4xl font-black tracking-tight md:text-5xl">
