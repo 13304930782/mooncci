@@ -33,7 +33,6 @@ export function SiteFooter() {
   const icpUrl = safeHref(footer.icp_url || defaultFooter.icp_url, defaultFooter.icp_url);
   const policeUrl = safeHref(footer.police_url || '', '');
   const policeIconUrl = safeImageSrc(footer.police_icon_url);
-  const logoUrl = safeImageSrc(brand.logo_url);
 
   useEffect(() => {
     api('/settings/site')
@@ -49,15 +48,11 @@ export function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="h-9 w-9 overflow-hidden rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600">
-              {logoUrl ? (
-                <img src={logoUrl} alt={brand.nav_title || 'mooncci'} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-black text-white">m</div>
-              )}
-            </div>
-            <p className="mt-3 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
-              {brand.nav_title || 'mooncci Blog'} — 个人博客与班级答辩视频评审平台。
+            <p className="text-base font-black tracking-tight text-slate-950 dark:text-white">
+              {brand.nav_title || 'mooncci Blog'}
+            </p>
+            <p className="mt-2 max-w-xs text-sm leading-6 text-slate-500 dark:text-slate-400">
+              个人博客与班级答辩视频评审平台。
             </p>
           </div>
 
