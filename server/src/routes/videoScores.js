@@ -1,34 +1,10 @@
 const express = require('express');
-const router = express.Router();
 const db = require('../db');
+const { authRequired, adminOnly } = require('../middleware/auth');
 
-let authRequired = (req, res, next) => next();
-let adminOnly = (req, res, next) => next();
+const router = express.Router();
 
-try {
-  const auth = require('../middleware/auth');
-  authRequired = auth.authRequired || authRequired;
-  adminOnly = auth.adminOnly || adminOnly;
-} catch (e) {
-  console.warn('[videoScores] auth middleware not loaded, admin routes are not protected');
-}
-
-function toScore(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  if (n < 0 || n > 100) return null;
-  return Math.round(n);
-}
-
-function clientIp(req) {
-  return (
-    req.headers['x-forwarded-for'] ||
-    req.socket?.remoteAddress ||
-    ''
-  ).toString().split(',')[0].trim();
-}
-
-async function ensureTable() {
+async function ensureLegacyScoresTable() {
   await db.query(`
     CREATE TABLE IF NOT EXISTS video_public_scores (
       id INT NOT NULL AUTO_INCREMENT,
@@ -52,90 +28,23 @@ async function ensureTable() {
   `);
 }
 
-ensureTable().catch(err => {
-  console.error('[videoScores] ensure table failed:', err);
+ensureLegacyScoresTable().catch((err) => {
+  console.error('[videoScores] ensure legacy table failed:', err);
 });
 
-router.post('/public/:videoId', async (req, res) => {
-  return res.status(410).json({
-    message: 'This legacy public scoring endpoint has been disabled. Use /api/videos/:id/public-score.',
+router.post('/public/:videoId', (_req, res) => {
+  res.status(410).json({
+    message: '旧版公共评分接口已停用，请使用 /api/videos/:id/public-score。',
   });
-
-  try {
-    await ensureTable();
-
-    const videoId = Number(req.params.videoId);
-    if (!Number.isInteger(videoId) || videoId <= 0) {
-      return res.status(400).json({ message: '视频 ID 无效' });
-    }
-
-    const contentScore = toScore(req.body.contentScore);
-    const presentationScore = toScore(req.body.presentationScore);
-    const creativityScore = toScore(req.body.creativityScore);
-    const teamworkScore = toScore(req.body.teamworkScore);
-
-    if (
-      contentScore === null ||
-      presentationScore === null ||
-      creativityScore === null ||
-      teamworkScore === null
-    ) {
-      return res.status(400).json({ message: '评分必须是 0-100 的数字' });
-    }
-
-    const [[video]] = await db.query(
-      'SELECT id FROM videos WHERE id = ? LIMIT 1',
-      [videoId]
-    );
-
-    if (!video) {
-      return res.status(404).json({ message: '视频不存在' });
-    }
-
-    const totalScore =
-      contentScore * 0.35 +
-      presentationScore * 0.25 +
-      creativityScore * 0.20 +
-      teamworkScore * 0.20;
-
-    await db.query(
-      `
-      INSERT INTO video_public_scores
-      (video_id, scorer_name, class_name, content_score, presentation_score, creativity_score, teamwork_score, total_score, comment, ip, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        videoId,
-        req.body.scorerName || null,
-        req.body.className || null,
-        contentScore,
-        presentationScore,
-        creativityScore,
-        teamworkScore,
-        Number(totalScore.toFixed(2)),
-        req.body.comment || null,
-        clientIp(req),
-        String(req.headers['user-agent'] || '').slice(0, 255),
-      ]
-    );
-
-    res.json({
-      message: '评分提交成功',
-      totalScore: Number(totalScore.toFixed(2)),
-    });
-  } catch (err) {
-    console.error('[videoScores/public] failed:', err);
-    res.status(500).json({ message: '评分提交失败' });
-  }
 });
 
 router.get('/public/:videoId/summary', async (req, res) => {
   try {
-    await ensureTable();
+    await ensureLegacyScoresTable();
 
     const videoId = Number(req.params.videoId);
     if (!Number.isInteger(videoId) || videoId <= 0) {
-      return res.status(400).json({ message: '视频 ID 无效' });
+      return res.status(400).json({ message: '视频 ID 无效。' });
     }
 
     const [[summary]] = await db.query(
@@ -156,13 +65,13 @@ router.get('/public/:videoId/summary', async (req, res) => {
     res.json(summary || {});
   } catch (err) {
     console.error('[videoScores/summary] failed:', err);
-    res.status(500).json({ message: '评分统计加载失败' });
+    res.status(500).json({ message: '评分统计加载失败。' });
   }
 });
 
-router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
+router.get('/admin/rankings', authRequired, adminOnly, async (_req, res) => {
   try {
-    await ensureTable();
+    await ensureLegacyScoresTable();
 
     const [rows] = await db.query(`
       SELECT
@@ -184,13 +93,13 @@ router.get('/admin/rankings', authRequired, adminOnly, async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('[videoScores/admin/rankings] failed:', err);
-    res.status(500).json({ message: '排名加载失败' });
+    res.status(500).json({ message: '排名加载失败。' });
   }
 });
 
-router.get('/admin/export.csv', authRequired, adminOnly, async (req, res) => {
+router.get('/admin/export.csv', authRequired, adminOnly, async (_req, res) => {
   try {
-    await ensureTable();
+    await ensureLegacyScoresTable();
 
     const [rows] = await db.query(`
       SELECT
@@ -226,23 +135,22 @@ router.get('/admin/export.csv', authRequired, adminOnly, async (req, res) => {
       'created_at',
     ];
 
-    const escapeCsv = value => {
+    const escapeCsv = (value) => {
       if (value === null || value === undefined) return '';
-      const text = String(value).replace(/"/g, '""');
-      return `"${text}"`;
+      return `"${String(value).replace(/"/g, '""')}"`;
     };
 
     const csv = [
       header.join(','),
-      ...rows.map(row => header.map(key => escapeCsv(row[key])).join(',')),
+      ...rows.map((row) => header.map((key) => escapeCsv(row[key])).join(',')),
     ].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="video_scores.csv"');
-    res.send('\uFEFF' + csv);
+    res.setHeader('Content-Disposition', 'attachment; filename="legacy_video_scores.csv"');
+    res.send(`\uFEFF${csv}`);
   } catch (err) {
     console.error('[videoScores/admin/export] failed:', err);
-    res.status(500).json({ message: '导出失败' });
+    res.status(500).json({ message: '导出失败。' });
   }
 });
 
