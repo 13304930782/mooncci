@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -8,6 +9,14 @@ const { authRequired, adminOnly, editorOrAdmin, videoReviewerOnly, isAdminLike, 
 
 const router = express.Router();
 const videoDir = path.join(__dirname, '../../uploads/videos');
+
+const publicScoreLimiter = rateLimit({
+  windowMs: Number(process.env.PUBLIC_SCORE_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000),
+  max: Number(process.env.PUBLIC_SCORE_RATE_LIMIT_MAX || 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many scoring requests. Please try again later.' },
+});
 
 if (!fs.existsSync(videoDir)) {
   fs.mkdirSync(videoDir, { recursive: true });
@@ -1587,7 +1596,7 @@ async function validatePublicScoreRequest(req, video) {
   return { scorerName, scorerClassCode, scorerGroupName };
 }
 
-router.get('/:id/public-score-status', async (req, res) => {
+router.get('/:id/public-score-status', publicScoreLimiter, async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, false);
     const checked = await validatePublicScoreRequest(req, video);
@@ -1619,7 +1628,7 @@ router.get('/:id/public-score-status', async (req, res) => {
   }
 });
 
-router.post('/:id/public-score', async (req, res) => {
+router.post('/:id/public-score', publicScoreLimiter, async (req, res) => {
   try {
     const video = await fetchVideo(req.params.id, false);
     const checked = await validatePublicScoreRequest(req, video);

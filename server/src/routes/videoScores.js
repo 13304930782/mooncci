@@ -57,6 +57,10 @@ ensureTable().catch(err => {
 });
 
 router.post('/public/:videoId', async (req, res) => {
+  return res.status(410).json({
+    message: 'This legacy public scoring endpoint has been disabled. Use /api/videos/:id/public-score.',
+  });
+
   try {
     await ensureTable();
 
