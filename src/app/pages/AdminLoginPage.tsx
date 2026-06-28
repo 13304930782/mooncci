@@ -1,114 +1,91 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { safeRoutePath } from '../lib/safeUrl';
-import { clearAuthCache } from '../lib/authToken';
 import { showAppToast } from '../components/AppToast';
+import { useAuth } from '../context/AuthContext';
+import { clearAuthCache } from '../lib/authToken';
+import { safeRoutePath } from '../lib/safeUrl';
 
 const DEFAULT_REDIRECT = '/admin/comments?status=pending';
+const REMEMBER_EMAIL_KEY = 'mooncci_admin_review_email';
 
 export default function AdminLoginPage() {
   const [params] = useSearchParams();
   const redirect = safeAdminRedirect(params.get('redirect'));
+  const { login, user, loading: authLoading } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBER_EMAIL_KEY) || '');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    clearAuthCache();
-  }, []);
+    if (authLoading || !user || !['owner', 'admin'].includes(user.role)) return;
+    goToRedirect(redirect);
+  }, [authLoading, redirect, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!email || !password) {
-      showAppToast('请填写管理员邮箱和密码');
+      showAppToast('请填写管理员邮箱和密码。', 'error');
       return;
     }
 
     setLoading(true);
-    setMessage('');
 
     try {
       clearAuthCache();
+      const loggedInUser = await login(email, password);
 
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const contentType = res.headers.get('content-type') || '';
-      const data = contentType.includes('application/json')
-        ? await res.json()
-        : { message: '接口返回异常，请检查后端 /api 代理' };
-
-      if (!res.ok) {
-        throw new Error(data.message || '登录失败');
-      }
-
-      if (!['owner', 'admin'].includes(data.user?.role)) {
+      if (!['owner', 'admin'].includes(loggedInUser.role)) {
         clearAuthCache();
-        showAppToast('这个账号不是站长或管理员账号，不能进入审核后台。请使用站长或管理员账号登录。');
+        showAppToast('这个账号不是站长或管理员账号，不能进入评论审核后台。', 'error');
         return;
       }
 
-
-      const target = redirect.includes('?')
-        ? `${redirect}&admin_login=${Date.now()}`
-        : `${redirect}?admin_login=${Date.now()}`;
-
-      window.location.replace(target);
+      localStorage.setItem(REMEMBER_EMAIL_KEY, email.trim().toLowerCase());
+      goToRedirect(redirect);
     } catch (err: any) {
-      showAppToast(err.message || '登录失败');
+      showAppToast(err.message || '登录失败。', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-purple-950 px-6 py-10 flex items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-purple-950 px-6 py-10">
       <div className="w-full max-w-md rounded-[2rem] bg-white/95 p-8 shadow-2xl">
         <Link to="/" className="text-sm text-blue-600 hover:underline">
           返回首页
         </Link>
 
         <div className="mt-6 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center">
-            <ShieldCheck className="w-6 h-6" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white">
+            <ShieldCheck className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              管理员审核登录
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900">管理员审核登录</h1>
             <p className="mt-1 text-sm text-gray-500">
               仅站长或管理员账号可以进入评论审核页面。
             </p>
           </div>
         </div>
 
-        {message && (
-          <div className="mt-6 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            {message}
-          </div>
-        )}
-
         <form onSubmit={submit} className="mt-6 space-y-5">
           <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
               管理员邮箱
             </label>
             <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
-              <Mail className="w-5 h-5 text-gray-400" />
-              <input type="email" name="email" id="email" autoComplete="username" inputMode="email"
+              <Mail className="h-5 w-5 text-gray-400" />
+              <input
+                type="email"
+                name="email"
+                id="email"
+                autoComplete="username"
+                inputMode="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-               
+                onChange={(event) => setEmail(event.target.value)}
                 placeholder="admin@example.com"
                 className="w-full bg-transparent outline-none"
               />
@@ -116,23 +93,28 @@ export default function AdminLoginPage() {
           </div>
 
           <div>
-            <label className="block mb-2 text-sm font-medium text-gray-700">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
               管理员密码
             </label>
             <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
-              <Lock className="w-5 h-5 text-gray-400" />
-              <input type="password" name="password" id="password" autoComplete="current-password"
+              <Lock className="h-5 w-5 text-gray-400" />
+              <input
+                type="password"
+                name="password"
+                id="password"
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-               
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="请输入管理员密码"
                 className="w-full bg-transparent outline-none"
               />
             </div>
           </div>
 
-          <button type="submit" disabled={loading}
-            className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-white font-medium hover:bg-blue-700 disabled:opacity-60"
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {loading ? '登录中...' : '登录并进入审核'}
           </button>
@@ -140,6 +122,14 @@ export default function AdminLoginPage() {
       </div>
     </div>
   );
+}
+
+function goToRedirect(redirect: string) {
+  const target = redirect.includes('?')
+    ? `${redirect}&admin_login=${Date.now()}`
+    : `${redirect}?admin_login=${Date.now()}`;
+
+  window.location.replace(target);
 }
 
 function safeAdminRedirect(input: string | null) {
