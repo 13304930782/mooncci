@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { showAppToast } from '../components/AppToast';
+import { api } from '../lib/api';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -11,16 +12,38 @@ export default function RegisterPage() {
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [codeLoading, setCodeLoading] = useState(false);
+
+  const sendRegisterCode = async () => {
+    if (!email.trim()) {
+      showAppToast('请先填写邮箱');
+      return;
+    }
+
+    setCodeLoading(true);
+    try {
+      const res = await api('/auth/register-code', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      showAppToast(res.message || '验证码已发送到邮箱');
+    } catch (err: any) {
+      showAppToast(err.message || '验证码发送失败');
+    } finally {
+      setCodeLoading(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (!username || !email || !password || !confirmPassword) {
-      showAppToast('请完整填写用户名、邮箱、密码和确认密码');
+    if (!username || !email || !emailCode || !password || !confirmPassword) {
+      showAppToast('请完整填写用户名、邮箱、验证码、密码和确认密码');
       return;
     }
 
@@ -38,7 +61,7 @@ export default function RegisterPage() {
     setMessage('');
 
     try {
-      await register(username, email, password);
+      await register(username, email, password, emailCode);
       showAppToast('注册成功，即将跳转登录页');
       setTimeout(() => navigate('/login'), 700);
     } catch (err: any) {
@@ -133,6 +156,32 @@ export default function RegisterPage() {
                   placeholder="your@email.com"
                   className="w-full bg-transparent outline-none text-gray-900 dark:text-white"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                邮箱验证码
+              </label>
+              <div className="flex gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500 dark:border-gray-800 dark:bg-gray-900">
+                  <Mail className="w-5 h-5 text-gray-400" />
+                  <input
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    inputMode="numeric"
+                    placeholder="6 位验证码"
+                    className="w-full bg-transparent outline-none text-gray-900 dark:text-white"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={codeLoading}
+                  onClick={sendRegisterCode}
+                  className="shrink-0 rounded-2xl bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {codeLoading ? '发送中' : '发送验证码'}
+                </button>
               </div>
             </div>
 

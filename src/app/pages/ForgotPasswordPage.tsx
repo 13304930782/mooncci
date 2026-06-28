@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
         </h1>
 
         <p className="mt-2 text-sm text-gray-500">
-          输入注册邮箱，我们会发送一封密码重置邮件。
+          输入注册邮箱，我们会发送重置链接和邮箱验证码。
         </p>
 
         {message && (

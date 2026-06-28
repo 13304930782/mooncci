@@ -10,6 +10,7 @@ export default function ResetPasswordPage() {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [emailCode, setEmailCode] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,8 +22,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (!password || !confirmPassword) {
-      showAppToast('请填写新密码和确认密码');
+    if (!emailCode || !password || !confirmPassword) {
+      showAppToast('请填写邮箱验证码、新密码和确认密码');
       return;
     }
 
@@ -42,7 +43,7 @@ export default function ResetPasswordPage() {
     try {
       const res = await api('/auth/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, password, email_code: emailCode }),
       });
 
       showAppToast(res.message || '密码已重置，请重新登录');
@@ -77,6 +78,22 @@ export default function ResetPasswordPage() {
         )}
 
         <form onSubmit={submit} className="mt-6 space-y-5">
+          <div>
+            <label className="block mb-2 text-sm font-medium text-gray-700">
+              邮箱验证码
+            </label>
+            <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
+              <Lock className="w-5 h-5 text-gray-400" />
+              <input
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputMode="numeric"
+                placeholder="邮件里的 6 位验证码"
+                className="w-full bg-transparent outline-none"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block mb-2 text-sm font-medium text-gray-700">
               新密码
