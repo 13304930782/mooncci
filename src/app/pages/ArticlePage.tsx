@@ -8,6 +8,7 @@ import { CommentSection } from '../components/CommentSection';
 import { applyPageSeoMeta, resetPageSeoMeta } from '../components/SiteMeta';
 import { api } from '../lib/api';
 import { showAppToast } from '../components/AppToast';
+import { fadeUp, fadeUpWithDelay } from '../lib/animations';
 
 const SITE_URL = 'https://mooncci.site';
 
@@ -129,9 +130,7 @@ export default function ArticlePage() {
 
       <main className="px-6 pt-32 pb-20">
         <motion.article
-          initial={{ opacity: 0, y: 28, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUp}
           className="max-w-4xl mx-auto rounded-3xl bg-white/85 dark:bg-gray-900/85 backdrop-blur border border-white/40 dark:border-gray-800 p-8 md:p-12 shadow-xl"
         >
           <Link to="/articles" className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
@@ -149,9 +148,7 @@ export default function ArticlePage() {
             <>
               {post.cover_image && (
                 <motion.img
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1, duration: 0.5 }}
+                  {...fadeUpWithDelay(0.08)}
                   src={post.cover_image}
                   alt={post.title}
                   className="mt-8 w-full max-h-[420px] object-cover rounded-3xl"

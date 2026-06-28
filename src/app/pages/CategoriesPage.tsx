@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { api } from '../lib/api';
+import { fadeUp } from '../lib/animations';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -20,9 +21,7 @@ export default function CategoriesPage() {
 
       <main className="max-w-6xl mx-auto px-6 pt-32 pb-20">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUp}
         >
           <Link to="/" className="text-sm text-blue-600 hover:underline">
             返回首页

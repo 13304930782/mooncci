@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BlogCard } from '../components/BlogCard';
 import { api } from '../lib/api';
+import { fadeUp } from '../lib/animations';
 
 export default function CategoryPage() {
   const { category = '' } = useParams();
@@ -23,9 +24,7 @@ export default function CategoryPage() {
 
       <main className="max-w-7xl mx-auto px-6 pt-32 pb-20">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUp}
           className="mb-10"
         >
           <Link to="/categories" className="text-sm text-blue-600 hover:underline">

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { initialSiteSettings } from '../config/initialSiteSettings';
 import { safeImageSrc } from '../lib/safeUrl';
+import { fadeUp, fadeUpWithDelay } from '../lib/animations';
 
 const defaultBrand = {
   site_title: 'Mooncci Blog',
@@ -267,7 +268,7 @@ export function Header() {
       <motion.header
         initial={{ y: -80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.28, ease: 'easeOut' }}
         className="fixed left-0 right-0 top-0 z-50"
       >
         <div className="mx-3 mt-3 rounded-2xl border border-white/80 bg-white/80 shadow-lg shadow-slate-950/5 backdrop-blur-2xl dark:border-slate-800 dark:bg-slate-950/80 md:mx-6">
@@ -383,8 +384,7 @@ export function Header() {
 
             {isMenuOpen && (
               <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
+                {...fadeUp}
                 className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-800 lg:hidden"
               >
                 <form onSubmit={submitSearch} className="mb-3 flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2 dark:bg-slate-800">
@@ -449,8 +449,7 @@ export function Header() {
       {searchOpen && (
         <div className="fixed inset-0 z-[80] flex items-start justify-center bg-slate-950/35 px-4 pt-28 backdrop-blur-md" onMouseDown={closePalette}>
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            {...fadeUpWithDelay(0)}
             className="w-full max-w-2xl overflow-hidden rounded-2xl border border-white/80 bg-white/95 shadow-2xl shadow-slate-950/20 dark:border-slate-800 dark:bg-slate-950/95"
             onMouseDown={(event) => event.stopPropagation()}
           >

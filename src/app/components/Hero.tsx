@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { defaultHomeSettings, type HomeSettings } from '../lib/homeContent';
+import { fadeUp, fadeUpWithDelay } from '../lib/animations';
 
 type HeroProps = {
   featuredPost?: any;
@@ -61,9 +62,7 @@ const Hero = ({ featuredPost, settings }: HeroProps) => {
 
       <div className="relative mx-auto grid max-w-7xl items-center gap-6 lg:grid-cols-[1.25fr_0.75fr]">
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUp}
         >
           <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-blue-100 bg-white/80 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-700 shadow-sm shadow-blue-900/5 backdrop-blur dark:border-blue-900/50 dark:bg-slate-900/80 dark:text-blue-300">
             <GraduationCap className="h-4 w-4" />
@@ -112,9 +111,7 @@ const Hero = ({ featuredPost, settings }: HeroProps) => {
         </motion.div>
 
         <motion.article
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUpWithDelay(0.08)}
           className="rounded-xl border border-white/80 border-l-[3px] border-l-blue-600 bg-white/80 p-4 shadow-lg shadow-blue-950/10 backdrop-blur dark:border-slate-800 dark:border-l-blue-500 dark:bg-slate-900/80 md:p-5 lg:mt-6 lg:self-start"
         >
           <div className="mb-3 flex items-center justify-between gap-3">

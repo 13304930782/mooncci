@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowUpRight, Calendar, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { safeImageSrc } from '../lib/safeUrl';
+import { scrollReveal } from '../lib/animations';
 
 interface BlogCardProps {
   id: number;
@@ -19,10 +20,7 @@ export function BlogCard({ id, title, excerpt, date, readTime, tags, image, inde
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-80px' }}
-      transition={{ delay: index * 0.04, duration: 0.32 }}
+      {...scrollReveal(index)}
       className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-950/5 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.10)] dark:border-slate-800 dark:bg-slate-900/80 dark:hover:bg-slate-900"
     >
       <Link to={'/article/' + id} className="block aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-slate-800">

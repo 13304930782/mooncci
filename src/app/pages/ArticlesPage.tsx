@@ -6,6 +6,7 @@ import { Header } from '../components/Header';
 import { SiteFooter } from '../components/SiteFooter';
 import { BlogCard } from '../components/BlogCard';
 import { api } from '../lib/api';
+import { fadeUp, stagger, staggerItem } from '../lib/animations';
 
 export default function ArticlesPage() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -24,9 +25,7 @@ export default function ArticlesPage() {
 
       <main className="mx-auto max-w-7xl px-4 pb-20 pt-28 sm:px-6 lg:pt-32">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeUp}
           className="mb-10 rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-xl shadow-slate-950/5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 md:p-8"
         >
           <Link
@@ -83,7 +82,7 @@ export default function ArticlesPage() {
           <motion.div
             initial="hidden"
             animate="show"
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+            variants={stagger}
             className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
           >
             {posts.map((post, index) => {
@@ -93,8 +92,8 @@ export default function ArticlesPage() {
               return (
                 <motion.div
                   key={post.id}
-                  variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  variants={staggerItem}
+                  transition={{ duration: 0.28, ease: 'easeOut' }}
                 >
                   <BlogCard
                     id={post.id}

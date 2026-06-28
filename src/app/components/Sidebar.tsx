@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { initialSiteSettings } from '../config/initialSiteSettings';
 import { safeHref, safeImageSrc, safeMailto } from '../lib/safeUrl';
+import { fadeUp, fadeUpWithDelay } from '../lib/animations';
 
 const defaultProfile = {
   name: 'mooncci',
@@ -42,9 +43,7 @@ export function Sidebar() {
   return (
     <div className="space-y-5">
       <motion.aside
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp}
         className="rounded-3xl border border-gray-200/70 bg-white p-6 shadow-sm shadow-gray-950/5 dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="flex items-center gap-4">
@@ -90,9 +89,7 @@ export function Sidebar() {
       </motion.aside>
 
       <motion.aside
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUpWithDelay(0.08)}
         className="rounded-3xl border border-gray-200/70 bg-white p-6 shadow-sm shadow-gray-950/5 dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="mb-4 flex items-center justify-between">
@@ -119,9 +116,7 @@ export function Sidebar() {
       </motion.aside>
 
       <motion.aside
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.16, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUpWithDelay(0.16)}
         className="rounded-3xl border border-gray-200/70 bg-white p-6 shadow-sm shadow-gray-950/5 dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="mb-4 flex items-center gap-2">

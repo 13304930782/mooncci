@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { showAppToast } from '../components/AppToast';
+import { fadeUp } from '../lib/animations';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -56,9 +57,7 @@ export default function RegisterPage() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: 28, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp}
         className="relative z-10 w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 rounded-[2rem] overflow-hidden border border-white/15 bg-white/10 backdrop-blur-2xl shadow-2xl"
       >
         <div className="hidden lg:flex flex-col justify-between p-10 text-white bg-gradient-to-br from-white/15 to-white/5">
