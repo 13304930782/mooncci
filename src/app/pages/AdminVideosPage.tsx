@@ -197,6 +197,39 @@ async function uploadVideo(videoId: number, file: File) {
   return data;
 }
 
+async function uploadRemoteVideo(videoId: number, file: File, onProgress: (percent: number) => void) {
+  const config = await api(`/videos/${videoId}/media-upload-token`);
+  const formData = new FormData();
+  formData.append('token', config.token);
+  formData.append('video', file);
+
+  const uploaded = await new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', config.upload_url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () => {
+      let data: any = {};
+      try {
+        data = JSON.parse(xhr.responseText || '{}');
+      } catch {
+        data = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(data.message || '视频服务器上传失败'));
+    };
+    xhr.onerror = () => reject(new Error('视频服务器连接失败'));
+    xhr.send(formData);
+  });
+
+  if (!uploaded.url) throw new Error('视频服务器没有返回播放地址');
+  return api(`/videos/${videoId}/remote-file`, {
+    method: 'POST',
+    body: JSON.stringify({ video_url: uploaded.url, size: uploaded.size || 0 }),
+  });
+}
+
 async function uploadCover(file: File) {
   const formData = new FormData();
   formData.append('image', file);
@@ -223,6 +256,8 @@ export default function AdminVideosPage() {
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
+  const [remoteUploadingId, setRemoteUploadingId] = useState<number | null>(null);
+  const [remoteUploadProgress, setRemoteUploadProgress] = useState(0);
   const [scoreVideo, setScoreVideo] = useState<VideoRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [rankings, setRankings] = useState<RankingRow[]>([]);
@@ -428,6 +463,25 @@ export default function AdminVideosPage() {
       showAppToast(err.message || '视频上传失败');
     } finally {
       setUploadingId(null);
+    }
+  };
+
+  const handleRemoteVideoFile = async (videoId: number, file?: File) => {
+    if (!file) return;
+
+    try {
+      setRemoteUploadingId(videoId);
+      setRemoteUploadProgress(0);
+      setMessage('');
+      await uploadRemoteVideo(videoId, file, setRemoteUploadProgress);
+      showAppToast('视频已上传到视频服务器并完成压缩');
+      loadVideos();
+      loadRankings();
+    } catch (err: any) {
+      showAppToast(err.message || '视频服务器上传失败');
+    } finally {
+      setRemoteUploadingId(null);
+      setRemoteUploadProgress(0);
     }
   };
 
@@ -968,6 +1022,11 @@ export default function AdminVideosPage() {
                       {uploadingId === video.id ? '上传中...' : video.source_type === 'local' ? '上传视频' : '上传并切为本地'}
                       <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(event) => handleVideoFile(video.id, event.target.files?.[0])} />
                     </label>
+                    <label className={`${canManageVideos ? 'inline-flex' : 'hidden'} cursor-pointer items-center gap-1 rounded-xl border border-blue-200 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50`}>
+                      <Upload className="h-4 w-4" />
+                      {remoteUploadingId === video.id ? `视频服务器 ${remoteUploadProgress}%` : '上传到视频服务器'}
+                      <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(event) => handleRemoteVideoFile(video.id, event.target.files?.[0])} />
+                    </label>
                     {video.source_type === 'direct' && video.video_url && (
                       <a href={video.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-xl border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50">
                         <ExternalLink className="h-4 w-4" />
@@ -992,6 +1051,11 @@ export default function AdminVideosPage() {
                     </button>
                   </div>
                 </div>
+                {remoteUploadingId === video.id && (
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-blue-50">
+                    <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${remoteUploadProgress}%` }} />
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -3,12 +3,16 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const FileType = require('file-type');
 const db = require('../db');
 const { authRequired, adminOnly, editorOrAdmin, videoReviewerOnly, isAdminLike, isVideoReviewerLike } = require('../middleware/auth');
 
 const router = express.Router();
 const videoDir = path.join(__dirname, '../../uploads/videos');
+const mediaUploadEndpoint = String(process.env.MEDIA_UPLOAD_ENDPOINT || '').trim().slice(0, 500);
+const mediaPublicBaseUrl = String(process.env.MEDIA_PUBLIC_BASE_URL || '').trim().slice(0, 500);
+const mediaUploadSecret = String(process.env.MEDIA_UPLOAD_SECRET || '').trim().slice(0, 200);
 
 const publicScoreLimiter = rateLimit({
   windowMs: Number(process.env.PUBLIC_SCORE_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000),
@@ -486,6 +490,14 @@ function normalizeDirectUrl(value) {
   const url = parseHttpUrl(value);
   if (!url) return '';
   return url.toString().slice(0, 800);
+}
+
+function signMediaUpload(videoId, expiresAt) {
+  if (!mediaUploadSecret) return '';
+  return crypto
+    .createHmac('sha256', mediaUploadSecret)
+    .update(`${videoId}:${expiresAt}`)
+    .digest('hex');
 }
 
 function sourceProviderMatches(row, providerName) {
@@ -1486,6 +1498,58 @@ router.post('/:id/file', authRequired, editorOrAdmin, (req, res) => {
       res.status(500).json({ message: '视频上传失败' });
     }
   });
+});
+
+router.get('/:id/media-upload-token', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    if (!mediaUploadEndpoint || !mediaUploadSecret) {
+      return res.status(503).json({ message: '视频服务器上传尚未配置' });
+    }
+
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+    if (!isAdminLike(req.user) && Number(video.created_by) !== Number(req.user.id)) {
+      return res.status(403).json({ message: '无权上传这个视频' });
+    }
+
+    const expiresAt = Date.now() + 15 * 60 * 1000;
+    res.json({
+      upload_url: mediaUploadEndpoint,
+      token: `${req.params.id}:${expiresAt}:${signMediaUpload(req.params.id, expiresAt)}`,
+      public_base_url: mediaPublicBaseUrl,
+    });
+  } catch (err) {
+    console.error('[videos/media-upload-token]', err);
+    res.status(500).json({ message: '视频服务器上传令牌生成失败' });
+  }
+});
+
+router.post('/:id/remote-file', authRequired, editorOrAdmin, async (req, res) => {
+  try {
+    const video = await fetchVideo(req.params.id, true);
+    if (!video) return res.status(404).json({ message: '视频不存在' });
+    if (!isAdminLike(req.user) && Number(video.created_by) !== Number(req.user.id)) {
+      return res.status(403).json({ message: '无权更新这个视频' });
+    }
+
+    const videoUrl = normalizeDirectUrl(req.body.video_url || req.body.videoUrl || req.body.url);
+    if (!videoUrl) return res.status(400).json({ message: '视频服务器没有返回有效播放地址' });
+    if (mediaPublicBaseUrl && !videoUrl.startsWith(mediaPublicBaseUrl)) {
+      return res.status(400).json({ message: '播放地址不属于已配置的视频服务器' });
+    }
+
+    if (video.video_filename) removeFile(videoPathFor(video.video_filename));
+
+    await db.query(
+      'UPDATE videos SET source_type="direct", video_url=?, video_filename=NULL, video_mime="video/mp4", video_size=?, embed_url=NULL, provider="media-server", updated_at=CURRENT_TIMESTAMP WHERE id=?',
+      [videoUrl, Number(req.body.size || 0) || null, req.params.id]
+    );
+
+    res.json(await fetchVideo(req.params.id, true));
+  } catch (err) {
+    console.error('[videos/remote-file]', err);
+    res.status(500).json({ message: '视频服务器地址保存失败' });
+  }
 });
 
 router.post('/:id/score', authRequired, async (req, res) => {
