@@ -215,6 +215,7 @@ CREATE TABLE `videos` (
   `summary` text,
   `team_name` varchar(120) DEFAULT NULL,
   `class_code` varchar(40) NOT NULL DEFAULT '',
+  `training_session` varchar(20) NOT NULL DEFAULT '',
   `speaker_names` varchar(255) DEFAULT NULL,
   `source_type` varchar(20) NOT NULL DEFAULT 'local',
   `video_url` varchar(500) DEFAULT NULL,

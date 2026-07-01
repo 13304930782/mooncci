@@ -48,6 +48,11 @@ const classOptions = [
   { code: 'software-24-10', label: '软件24-10' },
 ];
 const classCodes = new Set(classOptions.map((item) => item.code));
+const trainingSessionOptions = [
+  { code: 'training-1', label: '综训1' },
+  { code: 'training-2', label: '综训2' },
+];
+const trainingSessionCodes = new Set(trainingSessionOptions.map((item) => item.code));
 
 const detailedScoreFields = [
   { key: 'presentation_appearance_score', label: '仪表大方，衣着端庄，严肃认真（1分）', max: 1 },
@@ -89,6 +94,15 @@ function cleanClassCode(value) {
 
 function classLabel(code) {
   return classOptions.find((item) => item.code === code)?.label || '';
+}
+
+function cleanTrainingSession(value) {
+  const code = cleanString(value, 20).toLowerCase();
+  return trainingSessionCodes.has(code) ? code : '';
+}
+
+function trainingSessionLabel(code) {
+  return trainingSessionOptions.find((item) => item.code === code)?.label || '';
 }
 
 function cleanAllowedClasses(value) {
@@ -265,6 +279,10 @@ async function ensurePublicScoringSchemaOnce() {
 
   if (!(await columnExists('videos', 'class_code'))) {
     await db.query('ALTER TABLE videos ADD COLUMN class_code VARCHAR(40) NOT NULL DEFAULT "" AFTER team_name');
+  }
+
+  if (!(await columnExists('videos', 'training_session'))) {
+    await db.query('ALTER TABLE videos ADD COLUMN training_session VARCHAR(20) NOT NULL DEFAULT "" AFTER class_code');
   }
 
   if (!(await columnExists('video_scores', 'scorer_name'))) {
@@ -671,6 +689,8 @@ function mapVideoRow(row) {
     source_label: sourceLabel(row),
     class_code: cleanClassCode(row.class_code),
     class_label: classLabel(cleanClassCode(row.class_code)),
+    training_session: cleanTrainingSession(row.training_session),
+    training_session_label: trainingSessionLabel(cleanTrainingSession(row.training_session)),
     allowed_class_codes: [...new Set(allowedClassCodes)],
     allowed_class_labels: [...new Set(allowedClassCodes)].map(classLabel).filter(Boolean),
     score_count: Number(row.score_count || 0),
@@ -818,6 +838,8 @@ function buildRankingRows(videos, scoreRows) {
       title: video.title,
       class_code: video.class_code || '',
       class_label: video.class_label || '',
+      training_session: video.training_session || '',
+      training_session_label: video.training_session_label || '',
       team_name: video.team_name || '',
       speaker_names: video.speaker_names || '',
       status: video.status,
@@ -874,6 +896,12 @@ async function fetchAdminVideos(user, filters = {}) {
     params.push(videoClassCode);
   }
 
+  const trainingSession = cleanTrainingSession(filters.training_session || filters.trainingSession);
+  if (trainingSession) {
+    where.push('v.training_session=?');
+    params.push(trainingSession);
+  }
+
   const [rows] = await db.query(
     `
     ${buildVideoSummarySql(where.length ? `WHERE ${where.join(' AND ')}` : '')}
@@ -887,7 +915,9 @@ async function fetchAdminVideos(user, filters = {}) {
 
 async function fetchRankingRows(user, filters = {}) {
   const classCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
-  const videos = await fetchAdminVideos(user, classCode ? { video_class_code: classCode } : filters);
+  const trainingSession = cleanTrainingSession(filters.training_session || filters.trainingSession);
+  if (!classCode || !trainingSession) return [];
+  const videos = await fetchAdminVideos(user, { video_class_code: classCode, training_session: trainingSession });
   const videoIds = videos.map((video) => Number(video.id));
   if (!videoIds.length) return [];
 
@@ -917,7 +947,9 @@ async function fetchRankingRows(user, filters = {}) {
 
 async function fetchScoreRecordRows(user, filters = {}) {
   const classCode = cleanClassCode(filters.scorer_class_code || filters.video_class_code || filters.class_code);
-  const videos = await fetchAdminVideos(user, classCode ? { video_class_code: classCode } : filters);
+  const trainingSession = cleanTrainingSession(filters.training_session || filters.trainingSession);
+  if (!classCode || !trainingSession) return [];
+  const videos = await fetchAdminVideos(user, { video_class_code: classCode, training_session: trainingSession });
   const maxGroup = videos.reduce((max, video) => {
     const number = groupNumber(video.team_name);
     return Number.isFinite(number) && number !== Number.MAX_SAFE_INTEGER ? Math.max(max, number) : max;
@@ -969,6 +1001,8 @@ async function fetchScoreRecordRows(user, filters = {}) {
       title: '',
       class_code: classCode,
       class_label: classLabel(classCode),
+      training_session: trainingSession,
+      training_session_label: trainingSessionLabel(trainingSession),
       team_name: `第${number}组`,
       speaker_names: '',
       status: '',
@@ -1104,6 +1138,11 @@ router.use(async (_req, res, next) => {
 router.get('/', async (req, res) => {
   try {
     const classCode = cleanClassCode(req.query.class_code || req.query.class);
+    const trainingSession = cleanTrainingSession(req.query.training_session || req.query.trainingSession || req.query.training);
+    if (classCode && !trainingSession) {
+      res.json([]);
+      return;
+    }
     const where = classCode
       ? `WHERE v.status="published" AND (
           v.class_code=?
@@ -1111,9 +1150,10 @@ router.get('/', async (req, res) => {
             SELECT 1 FROM video_allowed_classes vac
             WHERE vac.video_id=v.id AND vac.class_code=?
           )
-        )`
+        )${trainingSession ? ' AND v.training_session=?' : ''}`
       : 'WHERE v.status="published"';
     const params = classCode ? [classCode, classCode] : [];
+    if (classCode && trainingSession) params.push(trainingSession);
 
     const [rows] = await db.query(
       `
@@ -1132,7 +1172,10 @@ router.get('/', async (req, res) => {
 
 router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) => {
   try {
-    if (!cleanClassCode(req.query.scorer_class_code || req.query.video_class_code || req.query.class_code)) {
+    if (
+      !cleanClassCode(req.query.scorer_class_code || req.query.video_class_code || req.query.class_code)
+      || !cleanTrainingSession(req.query.training_session || req.query.trainingSession)
+    ) {
       res.json([]);
       return;
     }
@@ -1147,6 +1190,7 @@ router.get('/admin/rankings', authRequired, videoReviewerOnly, async (req, res) 
 router.get('/admin/rankings/export', authRequired, videoReviewerOnly, async (req, res) => {
   try {
     const rows = cleanClassCode(req.query.scorer_class_code || req.query.video_class_code || req.query.class_code)
+      && cleanTrainingSession(req.query.training_session || req.query.trainingSession)
       ? await fetchScoreRecordRows(req.user, req.query)
       : [];
     const csv = buildScoreRecordCsv(rows);
@@ -1192,12 +1236,15 @@ router.post('/admin/class-scoring', authRequired, videoReviewerOnly, async (req,
   try {
     await ensurePublicScoringSchema();
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const trainingSession = cleanTrainingSession(req.body.training_session || req.body.trainingSession);
     if (!classCode) return res.status(400).json({ message: '请选择班级' });
+
+    if (!trainingSession) return res.status(400).json({ message: '请选择综训' });
 
     const enabled = cleanBoolean(req.body.public_scoring_enabled ?? req.body.publicScoringEnabled ?? req.body.enabled);
     const [result] = await db.query(
-      'UPDATE videos SET public_scoring_enabled=? WHERE class_code=?',
-      [enabled, classCode]
+      'UPDATE videos SET public_scoring_enabled=? WHERE class_code=? AND training_session=?',
+      [enabled, classCode, trainingSession]
     );
     await writeAdminLog(req, enabled ? 'open_class_scoring' : 'close_class_scoring', classCode, `affected=${result.affectedRows || 0}`);
 
@@ -1212,15 +1259,18 @@ router.post('/admin/class-scores/clear', authRequired, adminOnly, async (req, re
   try {
     await ensurePublicScoringSchema();
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const trainingSession = cleanTrainingSession(req.body.training_session || req.body.trainingSession);
     if (!classCode) return res.status(400).json({ message: '请选择班级' });
+
+    if (!trainingSession) return res.status(400).json({ message: '请选择综训' });
 
     const [result] = await db.query(
       `
       DELETE s FROM video_scores s
       INNER JOIN videos v ON v.id=s.video_id
-      WHERE v.class_code=?
+      WHERE v.class_code=? AND v.training_session=?
       `,
-      [classCode]
+      [classCode, trainingSession]
     );
     await writeAdminLog(req, 'clear_class_scores', classCode, `deleted=${result.affectedRows || 0}`);
 
@@ -1350,19 +1400,21 @@ router.post('/', authRequired, editorOrAdmin, async (req, res) => {
     const publishedAt = status === 'published' ? new Date() : null;
     const source = normalizeSourcePayload(req.body);
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const trainingSession = cleanTrainingSession(req.body.training_session || req.body.trainingSession);
     const allowedClasses = classCode ? [classCode] : [];
 
     const [result] = await db.query(
       `
       INSERT INTO videos
-      (title, summary, team_name, class_code, speaker_names, source_type, video_url, video_filename, video_mime, video_size, embed_url, provider, cover_image, public_scoring_enabled, status, sort_order, created_by, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (title, summary, team_name, class_code, training_session, speaker_names, source_type, video_url, video_filename, video_mime, video_size, embed_url, provider, cover_image, public_scoring_enabled, status, sort_order, created_by, published_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         title,
         cleanString(req.body.summary, 2000),
         cleanString(req.body.team_name, 120),
         classCode,
+        trainingSession,
         cleanString(req.body.speaker_names, 255),
         source.source_type,
         source.video_url,
@@ -1403,6 +1455,7 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
     const publishedAt = status === 'published' ? (video.published_at || new Date()) : null;
     const source = normalizeSourcePayload(req.body, video);
     const classCode = cleanClassCode(req.body.class_code || req.body.classCode);
+    const trainingSession = cleanTrainingSession(req.body.training_session || req.body.trainingSession);
     const allowedClasses = classCode ? [classCode] : [];
 
     if (source.source_type !== 'local' && video.video_filename) {
@@ -1412,7 +1465,7 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
     await db.query(
       `
       UPDATE videos
-      SET title=?, summary=?, team_name=?, class_code=?, speaker_names=?, source_type=?, video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=?, provider=?, cover_image=?, public_scoring_enabled=?, status=?, sort_order=?, published_at=?
+      SET title=?, summary=?, team_name=?, class_code=?, training_session=?, speaker_names=?, source_type=?, video_url=?, video_filename=?, video_mime=?, video_size=?, embed_url=?, provider=?, cover_image=?, public_scoring_enabled=?, status=?, sort_order=?, published_at=?
       WHERE id=?
       `,
       [
@@ -1420,6 +1473,7 @@ router.put('/:id', authRequired, editorOrAdmin, async (req, res) => {
         cleanString(req.body.summary, 2000),
         cleanString(req.body.team_name, 120),
         classCode,
+        trainingSession,
         cleanString(req.body.speaker_names, 255),
         source.source_type,
         source.video_url,

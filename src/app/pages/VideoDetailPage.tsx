@@ -6,6 +6,7 @@ import { SiteFooter } from '../components/SiteFooter';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { getVideoClassLabel, isVideoClassCode } from '../lib/videoClasses';
+import { getVideoTrainingSessionLabel, isVideoTrainingSessionCode } from '../lib/videoTrainingSessions';
 import { showAppToast } from '../components/AppToast';
 
 type VideoDetail = {
@@ -15,6 +16,8 @@ type VideoDetail = {
   team_name?: string;
   class_code?: string;
   class_label?: string;
+  training_session?: string;
+  training_session_label?: string;
   allowed_class_labels?: string[];
   allowed_class_codes?: string[];
   speaker_names?: string;
@@ -208,6 +211,7 @@ export default function VideoDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedClassCode = searchParams.get('class') || searchParams.get('class_code') || '';
+  const requestedTrainingSession = searchParams.get('training') || searchParams.get('training_session') || '';
   const { user } = useAuth();
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [form, setForm] = useState<ScoreForm>(emptyScore);
@@ -220,11 +224,29 @@ export default function VideoDetailPage() {
   const [scoreStatus, setScoreStatus] = useState<PublicScoreStatus | null>(null);
   const selectedClassCode = isVideoClassCode(requestedClassCode) ? requestedClassCode : '';
   const selectedClassLabel = getVideoClassLabel(selectedClassCode);
+  const selectedTrainingSession = isVideoTrainingSessionCode(requestedTrainingSession) ? requestedTrainingSession : '';
+  const selectedTrainingSessionLabel = getVideoTrainingSessionLabel(selectedTrainingSession);
 
   const totalScore = useMemo(
     () => dimensions.reduce((sum, item) => sum + Number(form[item.key] || 0), 0),
     [form]
   );
+
+  const requireEntryContext = () => {
+    if (!video) return false;
+
+    if (!selectedClassCode || (video.class_code && selectedClassCode !== video.class_code)) {
+      showAppToast('请先从对应班级入口进入视频。');
+      return false;
+    }
+
+    if (!selectedTrainingSession || (video.training_session && selectedTrainingSession !== video.training_session)) {
+      showAppToast('请先从对应综训入口进入视频。');
+      return false;
+    }
+
+    return true;
+  };
 
   const loadVideo = () => {
     if (!id) return;
@@ -265,6 +287,8 @@ export default function VideoDetailPage() {
       showAppToast('请先选择你的班级。');
       return;
     }
+
+    if (!requireEntryContext()) return;
 
     if (!normalizedScorerGroupName) {
       showAppToast('请先填写你的组号。');
@@ -316,6 +340,8 @@ export default function VideoDetailPage() {
       return;
     }
 
+    if (publicScoring && !requireEntryContext()) return;
+
     if (publicScoring && !normalizedScorerGroupName) {
       showAppToast('请先填写你的组号。');
       return;
@@ -338,6 +364,7 @@ export default function VideoDetailPage() {
           scorer_name: normalizedScorerName,
           scorer_class_code: selectedClassCode,
           scorer_group_name: normalizedScorerGroupName,
+          training_session: selectedTrainingSession,
         } : form),
       });
       setVideo(result.video);
@@ -353,7 +380,9 @@ export default function VideoDetailPage() {
   };
 
   const publicScoringEnabled = Number(video?.public_scoring_enabled || 0) === 1;
-  const fallbackListPath = selectedClassCode ? `/videos/${selectedClassCode}` : '/videos';
+  const fallbackListPath = selectedClassCode
+    ? `/video/${selectedClassCode}${selectedTrainingSession ? `?training=${selectedTrainingSession}` : ''}`
+    : '/videos';
   const goBackToList = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -394,6 +423,8 @@ export default function VideoDetailPage() {
               <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/85 p-6 shadow-sm shadow-slate-950/5 dark:border-slate-800 dark:bg-slate-900/85">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
                   {getDisplayTeamName(video.team_name) && <span>{getDisplayTeamName(video.team_name)}</span>}
+                  {(video.class_label || video.class_code) && <span>{video.class_label || getVideoClassLabel(video.class_code)}</span>}
+                  {(video.training_session_label || video.training_session) && <span>{video.training_session_label || getVideoTrainingSessionLabel(video.training_session)}</span>}
                   {video.speaker_names && <span>主讲：{video.speaker_names}</span>}
                   <span>{getSourceLabel(video)}</span>
                 </div>
@@ -457,6 +488,21 @@ export default function VideoDetailPage() {
                                 请先从对应班级入口进入视频，再进行评分。
                                 <Link to="/videos" className="mt-2 inline-flex rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white hover:bg-amber-700">
                                   返回选择班级
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                          <div className="block">
+                            <div className="text-sm font-semibold text-slate-900 dark:text-white">综训</div>
+                            {selectedTrainingSession ? (
+                              <div className="mt-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 dark:border-blue-900 dark:bg-slate-950 dark:text-white">
+                                {selectedTrainingSessionLabel}
+                              </div>
+                            ) : (
+                              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                                请先从对应综训入口进入视频，再进行评分。
+                                <Link to={selectedClassCode ? `/video/${selectedClassCode}` : '/videos'} className="mt-2 inline-flex rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white hover:bg-amber-700">
+                                  返回选择综训
                                 </Link>
                               </div>
                             )}
